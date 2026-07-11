@@ -8,3 +8,4 @@ temporary screenshots/
 .DS_Store
 next-env.d.ts
 *.tsbuildinfo
+.vercel
