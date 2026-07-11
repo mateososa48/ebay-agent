@@ -40,9 +40,7 @@ export async function recordEvent(
 }
 
 export async function listEventsByItem(db: Db, itemId: string): Promise<EventRow[]> {
-  // Tiebreak on ctid: sequential inserts in tests (and possibly bursts of
-  // agent events in production) can land on the same now() millisecond, so
-  // created_at alone can leave the order among ties undefined.
+  // ctid: best-effort tiebreaker for sub-ms insert ties; not a strong guarantee on updatable tables.
   const { rows } = await db.query<RawEvent>(
     `select * from events where item_id = $1 order by created_at desc, ctid desc`,
     [itemId],

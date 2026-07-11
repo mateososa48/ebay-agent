@@ -37,6 +37,7 @@ function mapListing(r: RawListing): ListingRow {
     title: r.title,
     specifics: r.specifics ?? {},
     description: r.description,
+    // numeric(10,2) -> float is fine for display; use integer cents if money math moves here later
     price: r.price === null ? null : Number(r.price),
     priceRange: r.price_range,
     ebayListingId: r.ebay_listing_id,
@@ -83,6 +84,7 @@ export async function getListing(db: Db, id: string): Promise<ListingRow | null>
 }
 
 export async function getListingByItem(db: Db, itemId: string): Promise<ListingRow | null> {
+  // ctid: best-effort tiebreaker for sub-ms insert ties; not a strong guarantee on updatable tables.
   const { rows } = await db.query<RawListing>(
     `select * from listings where item_id = $1 order by created_at desc, ctid desc limit 1`,
     [itemId],
@@ -92,8 +94,7 @@ export async function getListingByItem(db: Db, itemId: string): Promise<ListingR
 }
 
 export async function listListings(db: Db): Promise<ListingRow[]> {
-  // Tiebreak on ctid: rapid sequential inserts in tests can land on the same
-  // now() millisecond, and created_at alone would then leave order undefined.
+  // ctid: best-effort tiebreaker for sub-ms insert ties; not a strong guarantee on updatable tables.
   const { rows } = await db.query<RawListing>(
     `select * from listings order by created_at desc, ctid desc`,
   );

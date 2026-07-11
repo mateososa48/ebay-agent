@@ -51,4 +51,21 @@ describe('items repo', () => {
     expect((got?.condition as { flaws: string[] }).flaws).toEqual(['knee fade']);
     expect((got?.measurements as { waistIn: number }).waistIn).toBe(34);
   });
+
+  it('setItemEnrichment leaves omitted fields untouched', async () => {
+    db = await makeTestDb();
+    const item = await createItem(db, { photos: [] });
+    await setItemEnrichment(db, item.id, { identity: { brand: "Levi's" } });
+    await setItemEnrichment(db, item.id, { condition: { grade: 'used_good' } });
+    const got = await getItem(db, item.id);
+    // The second call omitted identity — it must NOT have been wiped.
+    expect((got?.identity as { brand: string }).brand).toBe("Levi's");
+    expect((got?.condition as { grade: string }).grade).toBe('used_good');
+  });
+
+  it('rejects an invalid status via the DB CHECK constraint', async () => {
+    db = await makeTestDb();
+    const item = await createItem(db, { photos: [] });
+    await expect(updateItemStatus(db, item.id, 'bogus')).rejects.toThrow();
+  });
 });

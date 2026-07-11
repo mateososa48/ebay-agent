@@ -52,8 +52,10 @@ export async function getApproval(db: Db, id: string): Promise<ApprovalRow | nul
 }
 
 export async function listPendingApprovals(db: Db): Promise<ApprovalRow[]> {
+  // ctid asc: stable FIFO tiebreaker for same-timestamp enqueues. Pending rows are
+  // never UPDATEd before they leave the queue, so their ctid is stable here.
   const { rows } = await db.query<RawApproval>(
-    `select * from approvals where state = 'pending' order by created_at asc`,
+    `select * from approvals where state = 'pending' order by created_at asc, ctid asc`,
   );
   return rows.map(mapApproval);
 }

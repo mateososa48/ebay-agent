@@ -58,8 +58,7 @@ export async function getItem(db: Db, id: string): Promise<ItemRow | null> {
 }
 
 export async function listItems(db: Db): Promise<ItemRow[]> {
-  // Tiebreak on ctid: rapid sequential inserts in tests can land on the same
-  // now() millisecond, and created_at alone would then leave order undefined.
+  // ctid: best-effort tiebreaker for sub-ms insert ties; not a strong guarantee on updatable tables.
   const { rows } = await db.query<RawItem>(
     `select * from items order by created_at desc, ctid desc`,
   );
@@ -75,18 +74,16 @@ export async function setItemEnrichment(
   id: string,
   data: { identity?: unknown; condition?: unknown; measurements?: unknown },
 ): Promise<void> {
+  // COALESCE keeps the existing column value when a field is omitted (SQL NULL),
+  // so a partial enrichment never clobbers previously-set fields.
+  const p = (v: unknown) => (v === undefined ? null : JSON.stringify(v));
   await db.query(
     `update items
-       set identity = $2::jsonb,
-           condition = $3::jsonb,
-           measurements = $4::jsonb,
+       set identity = coalesce($2::jsonb, identity),
+           condition = coalesce($3::jsonb, condition),
+           measurements = coalesce($4::jsonb, measurements),
            updated_at = now()
      where id = $1`,
-    [
-      id,
-      JSON.stringify(data.identity ?? null),
-      JSON.stringify(data.condition ?? null),
-      JSON.stringify(data.measurements ?? null),
-    ],
+    [id, p(data.identity), p(data.condition), p(data.measurements)],
   );
 }

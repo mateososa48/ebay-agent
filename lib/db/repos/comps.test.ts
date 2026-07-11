@@ -29,4 +29,13 @@ describe('comps repo', () => {
     const comps = await listCompsByItem(db, item.id);
     expect(comps.map((c) => c.title)).toEqual(['new']);
   });
+
+  it('replacing with an empty list leaves zero comps', async () => {
+    db = await makeTestDb();
+    const item = await createItem(db, { photos: [] });
+    await replaceCompsForItem(db, item.id, [{ source: 's', title: 'old', price: 1, sold: false }]);
+    await replaceCompsForItem(db, item.id, []);
+    const comps = await listCompsByItem(db, item.id);
+    expect(comps).toHaveLength(0);
+  });
 });
