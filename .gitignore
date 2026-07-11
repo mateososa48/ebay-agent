@@ -6,3 +6,5 @@ node_modules/
 temporary screenshots/
 .playwright-mcp/
 .DS_Store
+next-env.d.ts
+*.tsbuildinfo
