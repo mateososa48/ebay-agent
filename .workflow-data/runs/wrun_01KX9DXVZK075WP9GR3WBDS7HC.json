@@ -1,0 +1,38 @@
+{
+  "runId": "wrun_01KX9DXVZK075WP9GR3WBDS7HC",
+  "deploymentId": "dpl_local@5.0.0-beta.26",
+  "workflowName": "workflow//eve//turnWorkflow",
+  "specVersion": 5,
+  "executionContext": {
+    "traceCarrier": {},
+    "workflowCoreVersion": "5.0.0-beta.30",
+    "features": {
+      "encryption": false
+    }
+  },
+  "input": {
+    "__type": "Uint8Array",
+    "data": "enN0ZCi1L/1gFBEFTwBqkgQaPzBrmzbAwMDAwMAKC6qMYT/Q1krfVmZK7F7a1kIspZSUKjzWtEr/fqvlfp5X6/+YGhG7uzVpRBkFvXJkRkQIApkBmQGOAZEfXEHbsYwwWYGG9fFgjge0XkqLOfkBrW60Sm8n48MElc/vX3wPCLSmr+yAcI3vo4x4QBSSB7Rgx8hTYxMXa+Q0ph8eDn9HzeM8jkQCcpOwAqdbbHmtUFQDxMemKgnngyNWupiE4hhxsEVx079YFdhyqmjXW6Xv8S2tstqMhFBK6yIvg5DbQil/K9qY3vi+cUbv8/Tb3sA6iwLR7HgekYcdENc4HI0biSRFGmkCEWkiJA+TfiSQRVlHMf3LLNX/tqdfKqW1xPf+4FZMQG/kbVrBVE/t4uv8KhdzNBZ2b8pRgS3YbjENjgZajj0OaLljCasJtFx8FwkEWv38Fx7hgNZn9Ef5wDWGB/nR9sUgDmg1jPgffeBjU56LRTyOsq0MGUWKlYGtB4KSfpStibQ+xIBj8oDFYwIChAoIEhwHMGAABAoOUChgQiEBx1OJlWYW60qfaYC8d73QdGVgGh75nDZmMQhofZ2RYvb7Yg/QaiepxSQPaGMedYtFoBX7IidE+b7hpGRb7AEt7/cPvognt5WBReCoUAFi2gUSU+e4aTP5g1Gdy9utOkkr1pG//pEzrqfJ1CJfTnOdp40YjoLqfxixMc+yDm0I292jPTN62aQ8+XLHZ4ndlLdKCCLFoQFFBFpUv1ceedSDkgi0Kirf3wSJQOsRgZaDrcUe1g5ZYhomLKJdBCR2veD6qSMCrcUgINByiypD0grnabGHR2HaNUtDz2oC5PlafHQuFoFAq72PvRgE8jV69J85wkUQUhTxeCRN88MNBEuR5sFFkAbiAWmR1A1qTK/GNPRAoMXPjr+pxSaPDGzN/+nxWG7Bod1MpprGNZUNyJH2x9do1BvvL9INA+TS3OGUSBamyhkiM5uSk6XS/zCVx4FwHhLvn4VKBeJEnIiEkxgqDoTE44rDeXAeEpGEkQCwG22MRCXiSP5ByxQAXvCmPfqtYUtUJM7j4TwSjekGNeN0Gl5ZF39usYakJxGT58GRiSNq+iGKGo48kWbSHdE4eDKBeKJJ80iS5S2UavjLySdHbzT1PlbaYNo1GtNO42NbeCuOuvFTaxpBZpcu+5lqOG1voLGYhshEhoxcD9MW60Ru2BZufGzh7er+Lk3CKONJi3GRGCtRrEOjXIzKxwcjkeLEjJy+Ken7VUa8FfvWb7wugCqrzMrffwmsU0HIFYyP4VzPMJR2nechwb7TJ/XLOOebvGl9bkkAxw3no827AAenfU9Y9uBiGQENtoL9TGtrvBkZLws5cEDhLIoBFhMWi7JU7qIkICERYVG2Lw8+yWlfKFMNhzKiKl8Zl11UTDxoIkSYWHdUZhZyUwcqoWzLGsPzBo8yZqu+QAso2LAfJZUWcnDa35jy1PaJ2Awq2NBgHTho+G+CAwfb7G6kQBJs/0cfWAcSKc7HxsS3EtZxoJQz+5wHIL1tS2S6k+VNF0ywISNhfG1xNW7F1FZZNdjFcP3eFkt1jPV/3R6dlalRbm/6iBTHNeyI6li9o5y2mrLN7st+jdZ1Nwjf+7KMhOtvu0lRtpUo1qmWF1G8VWRvT3qtp7Oe1e/PZS4yjV5KWMdRYFQqyT2MhZAfrOOIFNqOyo1vmb/pVxawAAAQKZHiQMZIOicvfbXrhQ8RPM/zPM8TYRogItC6oF3hGUyxS7re0vm7UJlZYJ3LTu052ueJm/42pqOEUr6LPdvB+R5WKsrnsdK1cFR9qfxtaInPdyJSauuMniB5qJAx2zTuHcC3MZy/cqN8SyU3kiT3X3tQusNOO6Jq3I5ymszbvalzvPAxFcGigYZfmJTif50Osy71TRuVUuyl7Q2rxb/9yZtW56bYQl49BIe0Z/WpvdLGyJ2cXUP1pfF7awuOt5tO30iyaVipw6JAwChY2JdxURos5Q82hEx5bmPes6XjSgkduX2vCMhfluQ6SGWmtUR7Lgrt6WmVLlLCRVk2OTeMdZl7Q4r9w8B3t8yrhLW9b2rZx6b4vX9ZP2Ma9jJ/Zxkt5EAxsc7rqp6+wXo702k21hHgVHyxztK2RAk741HrT+V0sQ5z/f8oqmKbSKGYiMuidNpzObMYTLBBOnBpPbWmYVSlWwernLyaMu27UEWZoqp/bF/IBRNseCxXcD5gVBrDLokUR1rii1QGgXWo8SRDjBmaERGRpCBJOiEECYVxVGLPAxKg5j0GFY2QkoKUKhtz91CFdNSWthQ2oYL7kHPgGCVb5amUHh1kSIcM2WWgw/wVuAPKupmrSSnUB7EQuyepEEw7fSN8MG3hp7ZF4Hjsq6xBFqcBXFvIB7TUqRzYETOEgc4+zsdtax9ADSKqkXqubXDOsXm/yZ8ohcSd5ZXYOqaxEYmv0erP34Uo5qdiGV+PUS/FNEvWF7L1FyzbC8gOGNncbQ0boOoEfDlD0ynsaG1WkF6gMhb9Dl6fNYJT/qIfh9cGoNTaRTXf9BE8EnNYrMJuPXBGd9ZaiNGivmfk824OMYPU/fFIiG30A1mpuif7wbPnyc2QNMQlVMfXrQ3tmFYGrkaGmmPRkTma+Ljr0P2XzMTVYAa2t7yiDx9tsnk+Sjzl+LN4XOhzrftjn0H4RXmGa7daVB9gCMlhqgo7sMNHy45VLjw1yFdKPTT6+I7dJrbwleZvUD5so4lY46warBoTCre93DMQ+dmNVgq61r/60W8Mifeyk5Q2L3W3UrsLAuJ6F08t6OMWdwJY7+ijbsi+JAIjGTpruyEdVKd0c2PBZwzGe4R635UMe4bT7cEYXpeZHjnDckBGPD5lRH1y7iBySkRr+AD4o03AyS4YMcnErUl/tdy+4M+dxpAxYBjYbj9LHld1XIIg/QABK8iO2e9/4Emgt1U5D7LhPYt3cRzoP3w+Xo3YGTd0XIKbbd1Zbhzgxljco9WbGGrV5mwC0VgG/E3pJbaitPE9yBVfIzE7OkpBGJzbZeVzIf55uIbaiJ1naz3dKBFr2fK89QNl4I5E4FgdT+FH0TTkWTiFyViZXBrl9idabhnZrtjI0GBp8d1PWeuYY+6UqUUvNcBppVizatY+08kSE3Byw9cW0M9wXwS8EhgITyhJ1aCq7SkrfLW5e38ohkiBPYxKb6n/4/UfSHwCbGQ8nFwako5ihxxf/m5TxJ/Hi+jiohP1aP5O9N0z7GxB77dbgb55STkfWdDJhzER3yR+z84RZ3P6/R4L2O0MMZxueHmHCW5WqkfwHzrsSoZwdupj2OQa51Gd/h3gVHVSiksDYBatJQUhq2nyJcPBXKJZlKMBXvagthPECIAL2+pKwHCLWx0boTdPnasMag=="
+  },
+  "createdAt": "2026-07-11T20:29:29.974Z",
+  "startedAt": "2026-07-11T20:29:29.974Z",
+  "status": "completed",
+  "output": {
+    "__type": "Uint8Array",
+    "data": "ZGV2bC0x"
+  },
+  "completedAt": "2026-07-11T20:29:42.583Z",
+  "updatedAt": "2026-07-11T20:29:42.583Z",
+  "attributes": {
+    "$eve.type": "turn",
+    "$eve.parent": "wrun_01KX9DXVXHEQG1NHPHHA2RW91Q",
+    "$eve.root": "wrun_01KX9DXVXHEQG1NHPHHA2RW91Q",
+    "$eve.model": "anthropic/claude-haiku-4.5",
+    "$eve.input_tokens": "30185",
+    "$eve.output_tokens": "944",
+    "$eve.cache_read_tokens": "23397",
+    "$eve.cache_write_tokens": "6765",
+    "$eve.cost_usd": "0.007082700000000001",
+    "$eve.tool_count": "15"
+  }
+}

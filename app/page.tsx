@@ -4,20 +4,12 @@ import { DraftCard } from '@/components/queue/draft-card';
 import { Button, Eyebrow } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
 import { SAMPLE_DRAFTS, SAMPLE_STATS } from '@/lib/sample-data';
+import type { QueueDraft } from '@/lib/sample-data';
+import { getQueueDrafts, getListingCounts } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
-function Stat({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: string;
-}) {
+function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
     <div className="flex-1 px-6 py-5 first:pl-7">
       <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">{label}</div>
@@ -29,8 +21,32 @@ function Stat({
   );
 }
 
-export default function QueuePage() {
-  const s = SAMPLE_STATS;
+export default async function QueuePage() {
+  let realDrafts: QueueDraft[] = [];
+  try {
+    realDrafts = await getQueueDrafts(Date.now());
+  } catch {
+    realDrafts = [];
+  }
+  const usingReal = realDrafts.length > 0;
+  const drafts = usingReal ? realDrafts : SAMPLE_DRAFTS;
+
+  let stats = SAMPLE_STATS;
+  if (usingReal) {
+    let counts = { live: 0, sold: 0 };
+    try {
+      counts = await getListingCounts();
+    } catch {
+      /* ignore */
+    }
+    stats = {
+      awaiting: realDrafts.length,
+      live: counts.live,
+      queuedValue: realDrafts.reduce((sum, d) => sum + d.price, 0),
+      soldThisWeek: counts.sold,
+      soldValue: 0,
+    };
+  }
 
   return (
     <AppShell>
@@ -53,28 +69,26 @@ export default function QueuePage() {
         </Button>
       </header>
 
-      {/* Stat strip */}
       <div className="reveal mt-8 flex divide-x divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface shadow-raised" style={{ animationDelay: '60ms' }}>
-        <Stat label="Awaiting you" value={String(s.awaiting)} sub="ready to review" accent="var(--ebay-yellow)" />
-        <Stat label="Live listings" value={String(s.live)} sub="active on eBay" />
-        <Stat label="Queued value" value={`$${s.queuedValue}`} sub="if all approved" />
-        <Stat label="Sold this week" value={String(s.soldThisWeek)} sub={`$${s.soldValue} total`} accent="var(--ebay-green-deep)" />
+        <Stat label="Awaiting you" value={String(stats.awaiting)} sub="ready to review" accent="var(--ebay-yellow)" />
+        <Stat label="Live listings" value={String(stats.live)} sub="active on eBay" />
+        <Stat label="Queued value" value={`$${stats.queuedValue}`} sub="if all approved" />
+        <Stat label="Sold this week" value={String(stats.soldThisWeek)} sub={stats.soldValue ? `$${stats.soldValue} total` : 'this week'} accent="var(--ebay-green-deep)" />
       </div>
 
-      {/* Queue */}
       <section className="mt-10">
         <div className="reveal flex items-center justify-between" style={{ animationDelay: '100ms' }}>
           <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em] text-ink">
-            Awaiting your approval <span className="text-ink-faint tnum">· {s.awaiting}</span>
+            Awaiting your approval <span className="text-ink-faint tnum">· {stats.awaiting}</span>
           </h2>
-          <button className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink">
+          <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-muted">
             <Icon.Sparkle className="size-4 text-[var(--ebay-blue)]" />
-            Agent idle
-          </button>
+            {usingReal ? 'Live data' : 'Sample data'}
+          </span>
         </div>
 
         <div className="mt-4 grid gap-4">
-          {SAMPLE_DRAFTS.map((draft, i) => (
+          {drafts.map((draft, i) => (
             <DraftCard key={draft.id} draft={draft} index={i} />
           ))}
         </div>

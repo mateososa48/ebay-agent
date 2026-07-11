@@ -7,12 +7,20 @@ import { LinterPanel } from '@/components/review/linter-panel';
 import { ActionBar } from '@/components/review/action-bar';
 import { Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
-import { SAMPLE_LISTING } from '@/lib/sample-listing';
+import { SAMPLE_LISTING, type ListingDetail } from '@/lib/sample-listing';
+import { getListingDetail } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
-export default function ReviewPage() {
-  const l = SAMPLE_LISTING;
+export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  let real: ListingDetail | null = null;
+  try {
+    real = await getListingDetail(id);
+  } catch {
+    real = null;
+  }
+  const l = real ?? SAMPLE_LISTING;
 
   return (
     <AppShell>
@@ -38,9 +46,15 @@ export default function ReviewPage() {
           <Pill tone="blue" icon={<Icon.Sparkle className="size-3.5" />}>
             Identified · {Math.round(l.confidence * 100)}% sure
           </Pill>
-          <Pill tone="green" icon={<Icon.Shield className="size-3.5" />}>
-            Passes checks
-          </Pill>
+          {l.linter.warnings.length === 0 ? (
+            <Pill tone="green" icon={<Icon.Shield className="size-3.5" />}>
+              Passes checks
+            </Pill>
+          ) : (
+            <Pill tone="yellow" icon={<Icon.Alert className="size-3.5" />}>
+              {l.linter.warnings.length} style {l.linter.warnings.length === 1 ? 'note' : 'notes'}
+            </Pill>
+          )}
         </div>
       </header>
 

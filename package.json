@@ -33,6 +33,7 @@
     "@radix-ui/react-tabs": "^1.1.17",
     "@radix-ui/react-tooltip": "^1.2.12",
     "@tailwindcss/postcss": "^4.3.2",
+    "@vercel/blob": "^2.6.1",
     "@vercel/connect": "0.2.2",
     "ai": "^7.0.0",
     "clsx": "^2.1.1",
