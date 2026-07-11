@@ -11,3 +11,7 @@ export * as listings from './db/repos/listings';
 export * as comps from './db/repos/comps';
 export * as approvals from './db/repos/approvals';
 export * as events from './db/repos/events';
+export { identifyItem } from './agent/steps/identify';
+export { researchPrice } from './agent/steps/price';
+export { saveListingDraft } from './agent/steps/saveDraft';
+export type { SaveDraftResult } from './agent/steps/saveDraft';
