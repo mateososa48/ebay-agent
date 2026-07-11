@@ -32,7 +32,7 @@ The two non-negotiable quality bars:
 
 - **Agent runtime:** Vercel **eve** framework. Durable, checkpointed sessions (survive crashes/deploys), cron for polling (phases 2/3), per-tool approval gates, typed tools. Agent capabilities live as files under `agent/`.
 - **Dashboard:** **Next.js** (App Router) talking to the eve agent over its built-in HTTP channel (`withEve` / `useEveAgent`).
-- **Persistence:** **Supabase** — Postgres for state, Storage for photos, Auth for single-user login.
+- **Persistence:** **Neon** (serverless Postgres, provisioned via the Vercel Neon integration) for state, **Vercel Blob** for photo storage, and **simple single-user auth** (a shared secret / Vercel deployment protection — no multi-user system needed).
 - **Writing/vision model:** **Claude Opus 4.8**. Mechanical steps (linter, summaries, classification) route to a cheaper model (Haiku/Sonnet).
 - **Hosting:** Vercel (eve's home). Self-hosting is possible later (the `steve` pattern) but out of scope.
 
@@ -58,9 +58,11 @@ One durable eve session per item:
 
 Cheap steps route to the cheaper model; steps 1, 2, and 4 use Opus.
 
-## 6. Data model (Supabase / Postgres)
+## 6. Data model (Neon / Postgres)
 
-- **`items`** — the physical thing: `id`, `photos[]` (Storage refs), `seller_notes`, `identity` (jsonb), `condition` (jsonb), `measurements` (jsonb), `status`, timestamps.
+Schema managed with SQL migrations; accessed via `@neondatabase/serverless`. Photos live in Vercel Blob; the DB stores their URLs.
+
+- **`items`** — the physical thing: `id`, `photos[]` (Vercel Blob URLs), `seller_notes`, `identity` (jsonb), `condition` (jsonb), `measurements` (jsonb), `status`, timestamps.
 - **`listings`** — `id`, `item_id`, `title`, `specifics` (jsonb), `description`, `price`, `price_range` (jsonb), `ebay_listing_id` (nullable), `status` (draft/live/sold/ended), `linter_report` (jsonb), timestamps.
 - **`comps`** — price evidence: `id`, `item_id`, `source`, `title`, `price`, `sold` (bool), `ref`, `captured_at`.
 - **`approvals`** — the queue: `id`, `type` (listing|offer|message), `payload_ref`, `state` (pending/approved/rejected), timestamps.
@@ -99,11 +101,11 @@ It is a **living document** — the AI-vocabulary blocklist rotates over time an
 - **Identification accuracy** on ambiguous/unbranded items — mitigated by the confidence gate and seller clarification step.
 - **Pricing without sold data** — active comps are a weaker signal than sold comps; show evidence and let the seller adjust. Revisit Terapeak/Marketplace Insights later.
 - **Title length / Cassini tokenization** — optimal title length is unresolved (a "use all 80 chars" theory was refuted). Front-load brand/product/model; treat exact length as tunable.
-- **eBay OAuth token storage** — user token via authorization-code grant; store securely (Vercel Connect / Supabase). One-time consent.
+- **eBay OAuth token storage** — user token via authorization-code grant; store securely (Vercel Connect or an encrypted column in Neon). One-time consent.
 
 ## 11. Milestones
 
-1. **M1 — Skeleton:** eve agent scaffold + Next.js dashboard shell (eBay-native design system) + Supabase schema + `mock` adapter. End-to-end mock run: upload → draft → approve → "published" (mock).
+1. **M1 — Skeleton:** eve agent scaffold + Next.js dashboard shell (eBay-native design system) + Neon schema + `mock` adapter, deployed to Vercel. End-to-end mock run: upload → draft → approve → "published" (mock).
 2. **M2 — The brain:** real identification/condition/pricing reasoning (Opus) + VOICE.md writer + slop-linter (blocking + warnings) against mock data. Quality bar: drafts read as human, linter is green.
 3. **M3 — UI polish:** Listing Review + Queue to a high finish; screenshot-compare loop.
 4. **M4 — Go live:** flip adapter to eBay **Sandbox** when keyset arrives; wire OAuth, Media API upload, Trading API publish, Browse comps. Then Production.

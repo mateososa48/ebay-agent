@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript (strict), pnpm, Vitest, Zod. Node ≥ 24 (to match eve later). No runtime framework yet.
 
-**Scope note:** This is Plan 1 of 4 for v1. Follow-ons (own plans, written after this lands): **Plan 2** — Supabase schema + repositories; **Plan 3** — eve agent wiring (`agent/` dir, tools calling this library, `instructions.md` from `VOICE.md`); **Plan 4** — Next.js "eBay-native, elevated" dashboard. This plan produces a standalone, tested library.
+**Scope note:** This is Plan 1 of 4 for v1. Follow-ons (own plans, written after this lands): **Plan 2** — Neon (Postgres) schema + repositories; **Plan 3** — eve agent wiring (`agent/` dir, tools calling this library, `instructions.md` from `VOICE.md`); **Plan 4** — Next.js "eBay-native, elevated" dashboard. This plan produces a standalone, tested library.
 
 ---
 
@@ -840,7 +840,7 @@ git commit -m "feat: public library entry point (adapter + linter)"
 
 ## Roadmap (subsequent plans)
 
-- **Plan 2 — Supabase data layer:** migrations for `items`, `listings`, `comps`, `approvals`, `events`; typed repositories; Storage bucket for photos. Testable against a local Supabase instance.
+- **Plan 2 — Neon data layer:** SQL migrations for `items`, `listings`, `comps`, `approvals`, `events`; typed repositories via `@neondatabase/serverless`; Vercel Blob for photos. Testable against a Neon branch / local Postgres.
 - **Plan 3 — eve agent wiring:** `npx eve@latest init`; `agent/instructions.md` generated from `VOICE.md`; `agent/agent.ts` on `anthropic/claude-opus-4-8`; tools (`identify_item`, `research_price`, `lint_listing`, `submit_for_approval`) that call this library; end-to-end mock session via the documented HTTP API (`POST /eve/v1/session`).
-- **Plan 4 — Dashboard:** Next.js "eBay-native, elevated" UI (Queue, New Item, Listing Review, Listings, Settings) talking to eve over HTTP and Supabase; built with the frontend-design skill + screenshot-compare loop.
+- **Plan 4 — Dashboard:** Next.js "eBay-native, elevated" UI (Queue, New Item, Listing Review, Listings, Settings) talking to eve over HTTP and reading/writing Neon; built with the frontend-design skill + screenshot-compare loop.
 ```
