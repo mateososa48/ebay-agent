@@ -93,8 +93,87 @@ function complianceIssues(d: ListingDraft): LintIssue[] {
   return issues;
 }
 
+const NEG_PARALLELISM_RES = [
+  /\bnot just\b[^.?!]*\bbut\b/i,
+  /\bit'?s not\b[^.?!]*\bit'?s\b/i,
+  /\bnot only\b[^.?!]*\bbut also\b/i,
+];
+
+function countOccurrences(haystack: string, needles: string[]): string[] {
+  const lower = haystack.toLowerCase();
+  return needles.filter((n) => lower.includes(n.toLowerCase()));
+}
+
+function styleWarnings(d: ListingDraft): LintIssue[] {
+  const warnings: LintIssue[] = [];
+  const body = `${d.title} ${d.description}`;
+
+  const slopHits = [
+    ...countOccurrences(body, SIGNATURE_WORDS),
+    ...countOccurrences(body, PROMO_PHRASES),
+    ...countOccurrences(body, COPULA_DRESSING),
+  ];
+  const uniqueHits = [...new Set(slopHits)];
+  if (uniqueHits.length >= 2) {
+    warnings.push({
+      code: 'slop_vocabulary',
+      severity: 'warning',
+      field: 'description',
+      message: 'Reads as AI: too many stock LLM words/phrases. Rewrite plainer and more specific.',
+      matches: uniqueHits,
+    });
+  }
+
+  for (const re of NEG_PARALLELISM_RES) {
+    const m = d.description.match(re);
+    if (m) {
+      warnings.push({
+        code: 'negative_parallelism',
+        severity: 'warning',
+        field: 'description',
+        message: 'Negative-parallelism ("not just X, but Y") is a classic AI tell. Just say the thing.',
+        matches: [m[0]],
+      });
+      break;
+    }
+  }
+
+  const emDashes = (d.description.match(/—/g) ?? []).length;
+  if (emDashes >= 2) {
+    warnings.push({
+      code: 'em_dash_overuse',
+      severity: 'warning',
+      field: 'description',
+      message: `Em-dash overuse (${emDashes}). Prefer periods or commas; it reads as AI.`,
+    });
+  }
+
+  if (/[‘’“”]/.test(body)) {
+    warnings.push({
+      code: 'curly_quotes',
+      severity: 'warning',
+      field: 'description',
+      message: 'Curly quotes/apostrophes read as AI-pasted. Use straight quotes.',
+    });
+  }
+
+  const spamHits = countOccurrences(d.title, TITLE_SPAM_TOKENS);
+  const hasAllCaps = /\b[A-Z]{3,}\b/.test(d.title.replace(/\bUSA\b/g, '')); // allow common acronyms like USA
+  if (spamHits.length > 0 || hasAllCaps) {
+    warnings.push({
+      code: 'title_spam',
+      severity: 'warning',
+      field: 'title',
+      message: 'Title has spammy caps/markers that hurt search ranking. Use plain keywords buyers search.',
+      matches: spamHits.length > 0 ? spamHits : undefined,
+    });
+  }
+
+  return warnings;
+}
+
 export function lintListing(d: ListingDraft): LinterReport {
   const blocking = complianceIssues(d).filter((i) => i.severity === 'blocking');
-  const warnings: LintIssue[] = []; // style rules added in Task 6
+  const warnings = styleWarnings(d);
   return { ok: blocking.length === 0, blocking, warnings };
 }

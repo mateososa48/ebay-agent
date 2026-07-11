@@ -56,3 +56,42 @@ describe('lintListing — compliance (blocking)', () => {
     expect(r.blocking.some((i) => i.code === 'aspect_too_long')).toBe(true);
   });
 });
+
+describe('lintListing — style (warnings)', () => {
+  it('warns on signature-word / copula-dressing density', () => {
+    const r = lintListing(draft({
+      description: 'This vibrant, meticulous piece boasts an intricate design and stands as a testament to quality.',
+    }));
+    expect(r.ok).toBe(true); // style issues never block
+    expect(r.warnings.some((i) => i.code === 'slop_vocabulary')).toBe(true);
+  });
+
+  it('warns on negative parallelism', () => {
+    const r = lintListing(draft({
+      description: "It's not just a jacket, but a statement. Warm and clean.",
+    }));
+    expect(r.warnings.some((i) => i.code === 'negative_parallelism')).toBe(true);
+  });
+
+  it('warns on em-dash overuse', () => {
+    const r = lintListing(draft({
+      description: 'Solid jacket — barely worn — a great deal — ships fast.',
+    }));
+    expect(r.warnings.some((i) => i.code === 'em_dash_overuse')).toBe(true);
+  });
+
+  it('warns on curly quotes', () => {
+    const r = lintListing(draft({ description: 'A “great” find in clean shape.' }));
+    expect(r.warnings.some((i) => i.code === 'curly_quotes')).toBe(true);
+  });
+
+  it('warns on ALL-CAPS spam tokens in the title', () => {
+    const r = lintListing(draft({ title: "Levi's 501 Jeans L@@K RARE! 34x32" }));
+    expect(r.warnings.some((i) => i.code === 'title_spam')).toBe(true);
+  });
+
+  it('leaves a clean listing with no warnings', () => {
+    const r = lintListing(draft());
+    expect(r.warnings).toEqual([]);
+  });
+});
