@@ -17,6 +17,6 @@
     "noEmit": true,
     "plugins": [{ "name": "next" }]
   },
-  "include": ["lib", "app", "scripts", "next-env.d.ts", ".next/types/**/*.ts"],
+  "include": ["lib", "app", "agent", "scripts", "next-env.d.ts", ".next/types/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
