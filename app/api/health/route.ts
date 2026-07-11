@@ -1,11 +1,17 @@
+import { getDb } from '../../../lib/db/client';
+
 export const dynamic = 'force-dynamic';
 
-// Reports deployment + env health. The real Neon connectivity ping is wired in
-// Plan 2 (data layer); for now this just reflects whether DATABASE_URL is set.
+// Reports deployment + real Neon connectivity.
 export async function GET() {
-  return Response.json({
-    ok: true,
-    db: process.env.DATABASE_URL ? 'configured' : 'not_configured',
-    ts: new Date().toISOString(),
-  });
+  if (!process.env.DATABASE_URL) {
+    return Response.json({ ok: true, db: 'not_configured' });
+  }
+  try {
+    const db = getDb();
+    const { rows } = await db.query<{ ok: number }>('select 1 as ok');
+    return Response.json({ ok: true, db: 'connected', result: rows[0]?.ok ?? null });
+  } catch (e) {
+    return Response.json({ ok: false, db: 'error', error: String(e) }, { status: 500 });
+  }
 }
