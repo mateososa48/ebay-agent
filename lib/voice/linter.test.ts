@@ -95,3 +95,104 @@ describe('lintListing — style (warnings)', () => {
     expect(r.warnings).toEqual([]);
   });
 });
+
+describe('lintListing — compliance regressions (code review)', () => {
+  // FIX 2: identifiers must not be mistaken for phone numbers.
+  it('does NOT flag a bare serial number as a phone', () => {
+    const r = lintListing(draft({ description: 'Serial number 1234567890 on the back' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  it('does NOT flag a UPC aspect as a phone', () => {
+    const r = lintListing(draft({ aspects: { UPC: '012345678905' } }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  it('does NOT flag an ISBN aspect as a phone', () => {
+    const r = lintListing(draft({ aspects: { ISBN: '9780134685991' } }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  // FIX 1: aspect values are scanned independently, so concatenation can't forge a digit run.
+  it('does NOT forge a phone by joining separate aspect values', () => {
+    const r = lintListing(draft({ aspects: { 'Model Year': '2015', Mileage: '125000' } }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  // FIX 2: genuine phone numbers are still blocked.
+  it('blocks "Call or text 415 555 2671"', () => {
+    const r = lintListing(draft({ description: 'Call or text 415 555 2671' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(true);
+  });
+
+  it('blocks a parenthesized phone "(415) 555-2671"', () => {
+    const r = lintListing(draft({ description: '(415) 555-2671' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(true);
+  });
+
+  it('blocks a bare phone run when a contact cue precedes it', () => {
+    const r = lintListing(draft({ description: 'call 4155552671 anytime' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(true);
+  });
+
+  // FIX 3: bare-domain URL false positives (uppercase TLDs / dropped co,io).
+  it('does NOT flag "in.Store" as a URL', () => {
+    const r = lintListing(draft({ description: 'Available in.Store pickup only' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  it('does NOT flag "shop.Store" as a URL', () => {
+    const r = lintListing(draft({ description: 'Ships from our shop.Store hours vary' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  it('does NOT flag "Bench.co" as a URL', () => {
+    const r = lintListing(draft({ description: 'Model: Bench.co jacket' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(false);
+  });
+
+  it('blocks a www URL', () => {
+    const r = lintListing(draft({ description: 'See more at www.mystore.com' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(true);
+  });
+
+  it('blocks a bare .com domain', () => {
+    const r = lintListing(draft({ description: 'buy at mystore.com today' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(true);
+  });
+
+  it('blocks an http URL', () => {
+    const r = lintListing(draft({ description: 'http://mystore.com' }));
+    expect(r.blocking.some((i) => i.code === 'contact_info')).toBe(true);
+  });
+});
+
+describe('lintListing — style regressions (code review)', () => {
+  // FIX 4: a single slop word (with plural/verb variants) must not trip the density threshold.
+  it('does NOT warn slop_vocabulary on a single slop word', () => {
+    const r = lintListing(draft({ description: 'This jacket boasts a full zip.' }));
+    expect(r.warnings.some((i) => i.code === 'slop_vocabulary')).toBe(false);
+  });
+
+  // FIX 4: trimmed everyday words no longer count as slop.
+  it('does NOT warn slop_vocabulary on everyday words (significant, notable)', () => {
+    const r = lintListing(draft({ description: 'Significant wear on the sole, notable fade at the cuff.' }));
+    expect(r.warnings.some((i) => i.code === 'slop_vocabulary')).toBe(false);
+  });
+
+  it('still warns slop_vocabulary on 2+ distinct slop words', () => {
+    const r = lintListing(draft({ description: 'A vibrant, seamless piece, meticulously curated.' }));
+    expect(r.warnings.some((i) => i.code === 'slop_vocabulary')).toBe(true);
+  });
+
+  // FIX 5: allowlisted acronyms in a title must not warn.
+  it('does NOT warn title_spam on allowlisted acronyms', () => {
+    const r = lintListing(draft({ title: "Nike Dri-FIT Shirt NWT OEM USB LED Men's L" }));
+    expect(r.warnings.some((i) => i.code === 'title_spam')).toBe(false);
+  });
+
+  it('warns title_spam on non-acronym all-caps hype', () => {
+    const r = lintListing(draft({ title: 'STUNNING Vintage Jacket RARE!' }));
+    expect(r.warnings.some((i) => i.code === 'title_spam')).toBe(true);
+  });
+});
