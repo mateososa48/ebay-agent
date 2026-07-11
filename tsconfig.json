@@ -15,8 +15,10 @@
     "moduleDetection": "force",
     "incremental": true,
     "noEmit": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["./*"] },
     "plugins": [{ "name": "next" }]
   },
-  "include": ["lib", "app", "agent", "scripts", "next-env.d.ts", ".next/types/**/*.ts"],
+  "include": ["lib", "app", "agent", "components", "scripts", "next-env.d.ts", ".next/types/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
