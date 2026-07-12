@@ -1,9 +1,8 @@
 import { defineAgent } from 'eve';
 
-// Opus 4.8 is the quality bar for the listing copy, but the AI Gateway free
-// tier gates premium models — set EVE_AGENT_MODEL to run on whatever the
-// account can access (e.g. anthropic/claude-haiku-4.5) until gateway credits
-// are added.
+// Default is gpt-5.4-mini: strong copy and available on the AI Gateway free
+// tier. Override with EVE_AGENT_MODEL to run a premium model like
+// anthropic/claude-opus-4.8 once AI Gateway credits are added.
 export default defineAgent({
-  model: process.env.EVE_AGENT_MODEL ?? 'anthropic/claude-opus-4.8',
+  model: process.env.EVE_AGENT_MODEL ?? 'openai/gpt-5.4-mini',
 });

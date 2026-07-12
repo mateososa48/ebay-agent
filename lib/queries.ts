@@ -74,6 +74,46 @@ export async function getQueueDrafts(nowMs: number): Promise<QueueDraft[]> {
   });
 }
 
+export interface ListingRowView {
+  id: string;
+  sku: string;
+  title: string;
+  photo: string;
+  category: string;
+  price: number;
+  status: string;
+  compCount: number;
+  agedMinutes: number;
+}
+
+export async function getAllListings(nowMs: number): Promise<ListingRowView[]> {
+  serverNow = () => nowMs;
+  const db = getDb();
+  const { rows } = await db.query<Row>(
+    `select l.id, l.title, l.price, l.status, l.created_at,
+            i.id as item_id, i.photos, i.identity,
+            c.n as comp_n
+       from listings l
+       join items i on i.id = l.item_id
+       left join (select item_id, count(*) n from comps group by item_id) c on c.item_id = i.id
+      order by l.created_at desc`,
+  );
+  return rows.map((r) => {
+    const photos = (r.photos as string[] | null) ?? [];
+    return {
+      id: String(r.id),
+      sku: skuOf(String(r.item_id), r.identity),
+      title: String(r.title),
+      photo: photos[0] ?? '',
+      category: categoryLabel(r.identity),
+      price: Number(r.price ?? 0),
+      status: String(r.status),
+      compCount: Number(r.comp_n ?? 0),
+      agedMinutes: minutesSince(r.created_at),
+    };
+  });
+}
+
 export async function getListingCounts(): Promise<{ live: number; sold: number }> {
   const db = getDb();
   const { rows } = await db.query<Row>(
