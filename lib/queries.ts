@@ -1,5 +1,6 @@
 import 'server-only';
 import { getDb } from '@/lib/db/client';
+import { getEbayConnection } from '@/lib/db/repos/connection';
 import type { QueueDraft } from '@/lib/sample-data';
 import type { ListingDetail, CompRow } from '@/lib/sample-listing';
 
@@ -112,6 +113,24 @@ export async function getAllListings(nowMs: number): Promise<ListingRowView[]> {
       agedMinutes: minutesSince(r.created_at),
     };
   });
+}
+
+export interface EbayStatus {
+  keysConfigured: boolean;
+  connected: boolean;
+  connectedAt?: string;
+  env: string;
+}
+
+export async function getEbayStatus(): Promise<EbayStatus> {
+  const keysConfigured = Boolean(process.env.EBAY_APP_ID && process.env.EBAY_CERT_ID);
+  const env = process.env.EBAY_ENV ?? 'production';
+  try {
+    const conn = await getEbayConnection(getDb());
+    return { keysConfigured, connected: Boolean(conn), connectedAt: conn?.connectedAt, env };
+  } catch {
+    return { keysConfigured, connected: false, env };
+  }
 }
 
 export async function getListingCounts(): Promise<{ live: number; sold: number }> {

@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { AppShell } from '@/components/shell/app-shell';
 import { EbayMark } from '@/components/brand/ebay-mark';
-import { Card, Eyebrow, Pill } from '@/components/ui/primitives';
+import { Button, Card, Eyebrow, Pill } from '@/components/ui/primitives';
 import { Toggle } from '@/components/ui/toggle';
 import { Icon } from '@/components/ui/icons';
+import { getEbayStatus } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +33,9 @@ function Row({ label, hint, control }: { label: string; hint: string; control: R
   );
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const ebay = await getEbayStatus();
+
   return (
     <AppShell>
       <header className="reveal">
@@ -50,18 +54,46 @@ export default function SettingsPage() {
                   <EbayMark className="text-[16px]" />
                 </span>
                 <div>
-                  <div className="text-[14px] font-semibold text-ink">eBay Developer connection</div>
+                  <div className="text-[14px] font-semibold text-ink">eBay account</div>
                   <div className="mt-0.5 text-[13px] text-ink-muted">Powers listing, pricing, and messaging</div>
                 </div>
               </div>
-              <Pill tone="yellow" icon={<Icon.Clock className="size-3.5" />}>
-                Sandbox
-              </Pill>
+              {ebay.connected ? (
+                <Pill tone="green" icon={<Icon.Shield className="size-3.5" />}>
+                  Connected
+                </Pill>
+              ) : ebay.keysConfigured ? (
+                <Pill tone="blue" icon={<Icon.Sparkle className="size-3.5" />}>
+                  Keys active
+                </Pill>
+              ) : (
+                <Pill tone="neutral">Not configured</Pill>
+              )}
             </div>
-            <div className="mt-4 rounded-xl bg-surface-2/60 p-4 text-[13px] leading-relaxed text-ink-muted">
-              Running on mock data until your production keyset is added. Once your eBay Developer keys are set
-              as environment variables, this flips to the live Sandbox, then Production.
-            </div>
+
+            {ebay.connected ? (
+              <div className="mt-4 rounded-xl bg-[var(--tint-green)] p-4 text-[13px] leading-relaxed" style={{ color: 'var(--ebay-green-deep)' }}>
+                Connected to your eBay account on the <strong>{ebay.env}</strong> environment. Pricing pulls real
+                comps, and approved listings publish straight to your account.
+              </div>
+            ) : ebay.keysConfigured ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl bg-surface-2/60 p-4 text-[13px] leading-relaxed text-ink-muted">
+                  Your production keys are live — pricing already uses <strong className="text-ink">real eBay comps</strong>.
+                  Connect your account once to let approved listings publish to it.
+                </div>
+                <Button asChild variant="primary" size="md">
+                  <Link href="/api/ebay/connect">
+                    <EbayMark className="text-[13px]" />
+                    Connect eBay account
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl bg-surface-2/60 p-4 text-[13px] leading-relaxed text-ink-muted">
+                Running on mock data until your production keyset is set as environment variables.
+              </div>
+            )}
           </Card>
         </Section>
 
