@@ -59,6 +59,15 @@ export const SCHEMA_STATEMENTS: string[] = [
      data jsonb,
      created_at timestamptz not null default now()
    )`,
+  `create table if not exists ebay_connection (
+     id integer primary key default 1,
+     refresh_token text not null,
+     ebay_user text,
+     scopes text,
+     connected_at timestamptz not null default now(),
+     updated_at timestamptz not null default now(),
+     constraint ebay_connection_singleton check (id = 1)
+   )`,
   `create index if not exists idx_listings_item on listings(item_id)`,
   `create index if not exists idx_comps_item on comps(item_id)`,
   `create index if not exists idx_approvals_state on approvals(state)`,

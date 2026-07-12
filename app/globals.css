@@ -1,0 +1,198 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------ *
+ *  The Consignment Desk — design tokens
+ *  Warm paper light theme + a first-class dark counterpart.
+ *  Raw values live on :root / [data-theme]; @theme exposes them as
+ *  Tailwind utilities via `inline` so dark-mode switching just works.
+ * ------------------------------------------------------------------ */
+
+:root {
+  color-scheme: light;
+
+  --paper: #f6f4ef;
+  --paper-edge: #efece5;
+  --surface: #ffffff;
+  --surface-2: #f2efe9;
+  --ink: #211c16;
+  --ink-muted: #6e665b;
+  --ink-faint: #9a9184;
+  --hairline: #e7e1d7;
+  --hairline-strong: #ddd5c8;
+
+  --ebay-red: #e53238;
+  --ebay-blue: #0064d2;
+  --ebay-blue-deep: #0654ba;
+  --ebay-yellow: #f5af02;
+  --ebay-green: #86b817;
+  --ebay-green-deep: #497f1f;
+
+  --tint-blue: color-mix(in oklab, var(--ebay-blue) 8%, var(--surface));
+  --tint-green: color-mix(in oklab, var(--ebay-green) 12%, var(--surface));
+  --tint-yellow: color-mix(in oklab, var(--ebay-yellow) 14%, var(--surface));
+  --tint-red: color-mix(in oklab, var(--ebay-red) 8%, var(--surface));
+
+  --elev-1: 0 1px 2px rgba(50, 38, 24, 0.05), 0 4px 14px -6px rgba(50, 38, 24, 0.1);
+  --elev-2: 0 8px 40px -12px rgba(50, 38, 24, 0.22), 0 2px 6px rgba(50, 38, 24, 0.06);
+  --ring: color-mix(in oklab, var(--ebay-blue) 55%, transparent);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #131110;
+  --paper-edge: #17140f;
+  --surface: #1c1915;
+  --surface-2: #232019;
+  --ink: #f3eee6;
+  --ink-muted: #a79e90;
+  --ink-faint: #766e62;
+  --hairline: #2d2823;
+  --hairline-strong: #3a342c;
+
+  --ebay-blue: #4d93ff;
+  --ebay-blue-deep: #3b82f6;
+  --ebay-green: #9ccc34;
+  --ebay-green-deep: #9ccc34;
+  --ebay-red: #ff5a5f;
+  --ebay-yellow: #ffc033;
+
+  --tint-blue: color-mix(in oklab, var(--ebay-blue) 14%, var(--surface));
+  --tint-green: color-mix(in oklab, var(--ebay-green) 16%, var(--surface));
+  --tint-yellow: color-mix(in oklab, var(--ebay-yellow) 16%, var(--surface));
+  --tint-red: color-mix(in oklab, var(--ebay-red) 16%, var(--surface));
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px -8px rgba(0, 0, 0, 0.55);
+  --elev-2: 0 12px 48px -12px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-edge: var(--paper-edge);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+
+  --color-red: var(--ebay-red);
+  --color-blue: var(--ebay-blue);
+  --color-blue-deep: var(--ebay-blue-deep);
+  --color-yellow: var(--ebay-yellow);
+  --color-green: var(--ebay-green);
+  --color-green-deep: var(--ebay-green-deep);
+
+  --color-tint-blue: var(--tint-blue);
+  --color-tint-green: var(--tint-green);
+  --color-tint-yellow: var(--tint-yellow);
+  --color-tint-red: var(--tint-red);
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-raised: var(--elev-1);
+  --shadow-float: var(--elev-2);
+
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+}
+
+@layer base {
+  * {
+    border-color: var(--hairline);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--ebay-blue) 24%, transparent);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Tabular figures for money everywhere it matters */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+}
+
+@layer utilities {
+  /* Faint film-grain overlay for warmth/depth (very low opacity). */
+  .grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+
+  [data-theme='dark'] .grain::before {
+    mix-blend-mode: screen;
+    opacity: 0.6;
+  }
+
+  .hairline-x {
+    background-image: linear-gradient(to right, transparent, var(--hairline-strong), transparent);
+  }
+
+  .reveal {
+    opacity: 0;
+    animation: reveal-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, opacity;
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
