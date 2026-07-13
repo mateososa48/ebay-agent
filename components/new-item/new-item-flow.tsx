@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useEveAgent } from 'eve/react';
 import type { UserContent } from 'ai';
 import { upload } from '@vercel/blob/client';
-import { createItemAction } from '@/lib/actions';
+import { createItemAction, getDraftListingId } from '@/lib/actions';
 import { Dropzone } from './dropzone';
 import { Pipeline, type PipeStep, type StepState } from './pipeline';
 import { Button, Card, Eyebrow } from '@/components/ui/primitives';
@@ -81,6 +81,8 @@ export function NewItemFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState('');
+  const [itemId, setItemId] = useState<string | null>(null);
+  const [polledListingId, setPolledListingId] = useState<string | null>(null);
 
   const messages = (agent.data?.messages ?? []) as unknown as AnyMsg[];
   const running = agent.status === 'submitted' || agent.status === 'streaming';
@@ -179,6 +181,25 @@ export function NewItemFlow() {
     return { steps: built, listingId: lid, note: lastAssistantText(messages) };
   }, [messages, running]);
 
+  // The draft is saved server-side even if the live stream drops mid-run. Poll for
+  // it so the page always shows completion + the Review button.
+  const resolvedListingId = listingId ?? polledListingId;
+  useEffect(() => {
+    if (phase !== 'working' || !itemId || resolvedListingId) return;
+    let active = true;
+    const iv = setInterval(async () => {
+      const id = await getDraftListingId(itemId);
+      if (active && id) {
+        setPolledListingId(id);
+        clearInterval(iv);
+      }
+    }, 3000);
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
+  }, [phase, itemId, resolvedListingId]);
+
   function addFiles(newFiles: File[]) {
     setFiles((prev) => [...prev, ...newFiles]);
     setPreviews((prev) => [...prev, ...newFiles.map((f) => URL.createObjectURL(f))]);
@@ -198,10 +219,11 @@ export function NewItemFlow() {
         uploaded.push({ url: res.url, mediaType: f.type || 'image/jpeg' });
       }
       const urls = uploaded.map((u) => u.url);
-      const { itemId } = await createItemAction({ photos: urls, notes });
+      const { itemId: newItemId } = await createItemAction({ photos: urls, notes });
+      setItemId(newItemId);
       setPhase('working');
       const kickoff =
-        `Prepare an eBay listing for the item with itemId "${itemId}". Use that exact itemId in every tool call. ` +
+        `Prepare an eBay listing for the item with itemId "${newItemId}". Use that exact itemId in every tool call. ` +
         `The seller's photos are attached — look at them closely. ` +
         (notes.trim() ? `The seller's notes: "${notes.trim()}". ` : `The seller left no notes. `) +
         `Follow your instructions step by step.`;
@@ -298,12 +320,12 @@ export function NewItemFlow() {
       <Card className="p-7">
         <div className="flex items-center justify-between">
           <div>
-            <Eyebrow>{listingId ? 'Done' : 'Agent at work'}</Eyebrow>
+            <Eyebrow>{resolvedListingId ? 'Done' : 'Agent at work'}</Eyebrow>
             <h2 className="mt-1.5 font-display text-[22px] font-bold tracking-[-0.02em] text-ink">
-              {listingId ? 'Your draft is ready' : 'Building your listing'}
+              {resolvedListingId ? 'Your draft is ready' : 'Building your listing'}
             </h2>
           </div>
-          {!listingId && running && (
+          {!resolvedListingId && running && (
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--tint-blue)] px-3 py-1.5 text-[12px] font-medium" style={{ color: 'var(--ebay-blue)' }}>
               <span className="size-1.5 animate-pulse rounded-full" style={{ background: 'var(--ebay-blue)' }} />
               live
@@ -311,7 +333,7 @@ export function NewItemFlow() {
           )}
         </div>
 
-        {question && !listingId && (
+        {question && !resolvedListingId && (
           <div className="mt-6 rounded-2xl border border-hairline p-5" style={{ background: 'var(--tint-blue)' }}>
             <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ebay-blue)' }}>
               The agent needs a hand
@@ -376,10 +398,10 @@ export function NewItemFlow() {
           </div>
         )}
 
-        {listingId && (
+        {resolvedListingId && (
           <div className="mt-7 border-t border-hairline pt-6">
             <Button asChild variant="primary" size="lg">
-              <Link href={`/listings/${listingId}`}>
+              <Link href={`/listings/${resolvedListingId}`}>
                 Review your draft
                 <Icon.ChevronRight className="size-[18px]" />
               </Link>
