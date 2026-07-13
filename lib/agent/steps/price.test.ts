@@ -3,7 +3,7 @@ import { makeTestDb, type TestDb } from '../../db/testdb';
 import { MockEbayAdapter } from '../../ebay/mock';
 import { createItem, getItem } from '../../db/repos/items';
 import { listCompsByItem } from '../../db/repos/comps';
-import { identifyItem } from './identify';
+import { recordIdentity } from './identify';
 import { researchPrice } from './price';
 
 describe('researchPrice', () => {
@@ -14,7 +14,10 @@ describe('researchPrice', () => {
     db = await makeTestDb();
     const adapter = new MockEbayAdapter();
     const item = await createItem(db, { photos: ['x'], sellerNotes: "Levi's 501 jeans" });
-    await identifyItem(db, adapter, item.id);
+    await recordIdentity(db, item.id, {
+      brand: "Levi's", productType: 'Straight Leg Jeans', aspects: { Size: '34x32' },
+      condition: 'used_good', confidence: 0.85,
+    });
 
     const est = await researchPrice(db, adapter, item.id);
 

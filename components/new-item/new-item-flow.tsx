@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useEveAgent } from 'eve/react';
+import type { UserContent } from 'ai';
 import { upload } from '@vercel/blob/client';
 import { createItemAction } from '@/lib/actions';
 import { Dropzone } from './dropzone';
@@ -29,6 +30,25 @@ function scanTool(messages: AnyMsg[], tool: string) {
     }
   }
   return { started, done, output };
+}
+
+type InputReq = {
+  requestId: string;
+  prompt: string;
+  display?: 'confirmation' | 'select' | 'text';
+  allowFreeform?: boolean;
+  options?: readonly { id: string; label: string; description?: string; style?: 'danger' | 'default' | 'primary' }[];
+};
+type EvePart = AnyPart & { eve?: { inputRequest?: InputReq; inputResponse?: unknown } };
+
+/** The most recent unanswered question the agent raised via ask_question, if any. */
+function pendingQuestion(messages: AnyMsg[]): InputReq | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    for (const p of (messages[i]?.parts ?? []) as EvePart[]) {
+      if (p.eve?.inputRequest && !p.eve.inputResponse) return p.eve.inputRequest;
+    }
+  }
+  return null;
 }
 
 function lastAssistantText(messages: AnyMsg[]): string {
@@ -60,9 +80,41 @@ export function NewItemFlow() {
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [answerText, setAnswerText] = useState('');
 
   const messages = (agent.data?.messages ?? []) as unknown as AnyMsg[];
   const running = agent.status === 'submitted' || agent.status === 'streaming';
+  const question = useMemo(() => pendingQuestion(messages), [messages]);
+
+  async function submitAnswer(optionId?: string) {
+    if (!question) return;
+    const text = answerText.trim() || undefined;
+    setAnswerText('');
+    await agent.send({ inputResponses: [{ requestId: question.requestId, optionId, text }] });
+  }
+
+  // Keep the seller's note across an accidental refresh/navigation.
+  useEffect(() => {
+    const saved = sessionStorage.getItem('new-item-notes');
+    if (saved) setNotes(saved);
+  }, []);
+  useEffect(() => {
+    sessionStorage.setItem('new-item-notes', notes);
+  }, [notes]);
+
+  // Warn before leaving with staged photos or an in-flight run (the item isn't saved yet).
+  const dirty =
+    (phase === 'upload' && (files.length > 0 || notes.trim().length > 0)) ||
+    (phase === 'working' && running);
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
 
   const { steps, listingId, note } = useMemo(() => {
     const identify = scanTool(messages, 'identify_item');
@@ -90,9 +142,9 @@ export function NewItemFlow() {
         label: 'Researching a price',
         hint: price.done
           ? prOut?.suggested
-            ? `$${prOut.suggested} from ${prOut.comps?.length ?? 0} sold comps`
+            ? `$${prOut.suggested} from ${prOut.comps?.length ?? 0} comps`
             : 'Priced from comps'
-          : 'Pulling comparable sold listings',
+          : 'Pulling comparable listings + web research',
         tone: 'green',
         icon: <Icon.Trend className="size-[18px]" />,
         state: stepState(price.started, price.done, identify.done && running),
@@ -147,9 +199,20 @@ export function NewItemFlow() {
       }
       const { itemId } = await createItemAction({ photos: urls, notes });
       setPhase('working');
-      await agent.send({
-        message: `Prepare an eBay listing for the item with itemId "${itemId}". Use that exact itemId in every tool call, and follow your instructions step by step.`,
-      });
+      const kickoff =
+        `Prepare an eBay listing for the item with itemId "${itemId}". Use that exact itemId in every tool call. ` +
+        `The seller's photos are attached — look at them closely. ` +
+        (notes.trim() ? `The seller's notes: "${notes.trim()}". ` : `The seller left no notes. `) +
+        `Follow your instructions step by step.`;
+      // Hand the model the actual photos (vision) + the notes, not just the itemId.
+      // Cap the images sent to the model — a dozen full-res photos bloats the
+      // vision context and is what stalled the heavier run; 8 is plenty to identify.
+      const content: UserContent = [
+        { type: 'text', text: kickoff },
+        ...urls.slice(0, 8).map((url) => ({ type: 'image' as const, image: url })),
+      ];
+      sessionStorage.removeItem('new-item-notes');
+      await agent.send({ message: content });
     } catch (e) {
       setError((e as Error).message);
       setPhase('upload');
@@ -246,6 +309,53 @@ export function NewItemFlow() {
             </span>
           )}
         </div>
+
+        {question && !listingId && (
+          <div className="mt-6 rounded-2xl border border-hairline p-5" style={{ background: 'var(--tint-blue)' }}>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ebay-blue)' }}>
+              The agent needs a hand
+            </span>
+            <p className="mt-2 text-[15px] font-medium leading-relaxed text-ink">{question.prompt}</p>
+            {question.options && question.options.length > 0 && (
+              <div className="mt-3.5 flex flex-wrap gap-2">
+                {question.options.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => submitAnswer(o.id)}
+                    className="h-9 rounded-full border border-hairline-strong bg-surface px-4 text-[13px] font-medium text-ink shadow-raised transition-transform hover:-translate-y-px active:scale-[0.97]"
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(question.allowFreeform || question.display === 'text' || !question.options?.length) && (
+              <form
+                className="mt-3 flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (answerText.trim()) void submitAnswer();
+                }}
+              >
+                <input
+                  value={answerText}
+                  onChange={(e) => setAnswerText(e.target.value)}
+                  placeholder="Type your answer…"
+                  autoFocus
+                  className="flex-1 rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-[14px] text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-[var(--ebay-blue)]"
+                />
+                <button
+                  type="submit"
+                  disabled={!answerText.trim()}
+                  className="h-[42px] rounded-xl px-4 text-[13.5px] font-semibold text-white transition-transform hover:-translate-y-px active:scale-[0.97] disabled:opacity-50"
+                  style={{ background: 'var(--ebay-blue)' }}
+                >
+                  Send
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
         <div className="mt-7">
           <Pipeline steps={steps} />

@@ -36,7 +36,7 @@ export function PricePanel({
           </div>
         </div>
         <Pill tone="green" icon={<Icon.Trend className="size-3.5" />}>
-          From sold comps
+          From comps
         </Pill>
       </div>
 
@@ -55,7 +55,7 @@ export function PricePanel({
           {comps.map((c, i) => (
             <span
               key={i}
-              title={`Sold $${c.price}`}
+              title={`$${c.price}`}
               className="absolute top-[29px] size-2.5 -translate-x-1/2 rounded-full ring-2 ring-surface"
               style={{ left: `${pct(c.price)}%`, background: 'var(--ebay-green)' }}
             />
@@ -72,7 +72,7 @@ export function PricePanel({
         </div>
         <div className="mt-2 flex items-center justify-between font-mono text-[11px] text-ink-faint tnum">
           <span>${min} low</span>
-          <span className="text-ink-muted">{comps.length} sold · last 90 days</span>
+          <span className="text-ink-muted">{comps.length} comps</span>
           <span>${max} high</span>
         </div>
       </div>
