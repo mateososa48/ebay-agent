@@ -56,6 +56,7 @@ export function getConsentUrl(): string {
   url.searchParams.set('redirect_uri', ruName); // eBay RuName
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', EBAY_USER_SCOPES);
+  url.searchParams.set('prompt', 'login'); // force a fresh consent, never a cached session
   return url.toString();
 }
 
