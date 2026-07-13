@@ -192,11 +192,12 @@ export function NewItemFlow() {
     setBusy(true);
     setError(null);
     try {
-      const urls: string[] = [];
+      const uploaded: { url: string; mediaType: string }[] = [];
       for (const f of files) {
         const res = await upload(f.name, f, { access: 'public', handleUploadUrl: '/api/blob-upload' });
-        urls.push(res.url);
+        uploaded.push({ url: res.url, mediaType: f.type || 'image/jpeg' });
       }
+      const urls = uploaded.map((u) => u.url);
       const { itemId } = await createItemAction({ photos: urls, notes });
       setPhase('working');
       const kickoff =
@@ -209,7 +210,7 @@ export function NewItemFlow() {
       // vision context and is what stalled the heavier run; 8 is plenty to identify.
       const content: UserContent = [
         { type: 'text', text: kickoff },
-        ...urls.slice(0, 8).map((url) => ({ type: 'image' as const, image: url })),
+        ...uploaded.slice(0, 8).map((u) => ({ type: 'file' as const, data: u.url, mediaType: u.mediaType })),
       ];
       sessionStorage.removeItem('new-item-notes');
       await agent.send({ message: content });
