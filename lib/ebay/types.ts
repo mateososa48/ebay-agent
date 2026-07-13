@@ -1,4 +1,4 @@
-import type { ItemIdentity, Comp, ListingDraft } from '../types';
+import type { ItemIdentity, Comp, ListingDraft, ItemCondition } from '../types';
 
 export interface IdentifyByImageInput {
   images: string[]; // base64 data or storage refs (opaque to the adapter contract)
@@ -8,6 +8,23 @@ export interface IdentifyByImageInput {
 export interface PublishResult {
   ebayListingId: string;
   url: string;
+}
+
+/** Everything the Trading API needs to list one fixed-price item. */
+export interface PublishListingInput {
+  title: string;
+  description: string;
+  price: number; // USD dollars
+  categoryId: string; // eBay leaf category id
+  condition: ItemCondition;
+  aspects: Record<string, string>; // item specifics
+  photoUrls: string[]; // public image URLs (Vercel Blob)
+  postalCode: string; // ship-from ZIP
+}
+
+export interface VerifyResult {
+  ok: boolean;
+  errors: string[]; // eBay error LongMessages; empty when ok
 }
 
 /**
