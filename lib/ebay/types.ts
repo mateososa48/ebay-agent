@@ -1,4 +1,4 @@
-import type { ItemIdentity, Comp, ListingDraft, ItemCondition } from '../types';
+import type { ItemIdentity, Comp, ItemCondition } from '../types';
 
 export interface IdentifyByImageInput {
   images: string[]; // base64 data or storage refs (opaque to the adapter contract)
@@ -36,5 +36,6 @@ export interface VerifyResult {
 export interface EbayAdapter {
   identifyByImage(input: IdentifyByImageInput): Promise<ItemIdentity>;
   findComps(query: { identity: ItemIdentity }): Promise<Comp[]>;
-  publishListing(draft: ListingDraft): Promise<PublishResult>;
+  verifyListing(input: PublishListingInput): Promise<VerifyResult>;
+  publishListing(input: PublishListingInput): Promise<PublishResult>;
 }

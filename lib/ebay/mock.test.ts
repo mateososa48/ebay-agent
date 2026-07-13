@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { MockEbayAdapter } from './mock';
 import { getEbayAdapter } from './index';
+import type { PublishListingInput } from './types';
+
+const INPUT: PublishListingInput = {
+  title: 'X', description: 'Y', price: 10, categoryId: '1', condition: 'new',
+  aspects: {}, photoUrls: [], postalCode: '94103',
+};
 
 describe('MockEbayAdapter', () => {
   const adapter = new MockEbayAdapter();
@@ -31,16 +37,16 @@ describe('MockEbayAdapter', () => {
     }
   });
 
-  it('publishes and returns an id + url', async () => {
-    const res = await adapter.publishListing({
-      title: "Levi's 501 Vintage Jeans Men's 34x32",
-      aspects: { Brand: "Levi's", Size: '34x32' },
-      description: 'Solid pair, light wear at the knee. Ships next day.',
-      price: 48,
-      condition: 'used_good',
-    });
-    expect(res.ebayListingId).toMatch(/^MOCK-/);
-    expect(res.url).toContain(res.ebayListingId);
+});
+
+describe('MockEbayAdapter publish/verify', () => {
+  it('verify always ok', async () => {
+    expect(await new MockEbayAdapter().verifyListing(INPUT)).toEqual({ ok: true, errors: [] });
+  });
+  it('publish returns a mock id + url', async () => {
+    const r = await new MockEbayAdapter().publishListing(INPUT);
+    expect(r.ebayListingId).toMatch(/^MOCK-/);
+    expect(r.url).toContain(r.ebayListingId);
   });
 });
 

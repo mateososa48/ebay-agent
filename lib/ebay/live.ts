@@ -1,4 +1,4 @@
-import type { EbayAdapter, IdentifyByImageInput, PublishResult } from './types';
+import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult } from './types';
 import type { ItemIdentity, Comp } from '../types';
 import { MockEbayAdapter } from './mock';
 import { getAppToken, ebayApiBase } from './oauth';
@@ -34,11 +34,12 @@ export class LiveEbayAdapter implements EbayAdapter {
     }
   }
 
-  async publishListing(draft: Parameters<EbayAdapter['publishListing']>[0]): Promise<PublishResult> {
-    void draft;
-    throw new Error(
-      'Publishing to eBay needs your account connected (OAuth) and business policies enabled — not wired yet.',
-    );
+  verifyListing(_input: PublishListingInput): Promise<VerifyResult> {
+    throw new Error('verifyListing not wired yet');
+  }
+
+  publishListing(_input: PublishListingInput): Promise<PublishResult> {
+    throw new Error('publishListing not wired yet');
   }
 
   private async browseComps(identity: ItemIdentity): Promise<Comp[]> {
