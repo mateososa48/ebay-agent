@@ -10,6 +10,7 @@ export interface ListingDetail {
   title: string;
   category: string;
   condition: string;
+  status: string;
   confidence: number;
   photos: string[];
   price: number;
@@ -32,6 +33,7 @@ export const SAMPLE_LISTING: ListingDetail = {
   title: 'Contax T2 35mm Film Camera Titanium Black Carl Zeiss 38mm f/2.8 Point Shoot',
   category: 'Cameras & Photo › Film Cameras',
   condition: 'Used · Like New',
+  status: 'draft',
   confidence: 0.94,
   photos: [img('contaxt2a'), img('contaxt2b'), img('contaxt2c'), img('contaxt2d'), img('contaxt2e')],
   price: 749,
