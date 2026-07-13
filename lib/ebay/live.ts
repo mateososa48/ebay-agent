@@ -2,6 +2,8 @@ import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingIn
 import type { ItemIdentity, Comp } from '../types';
 import { MockEbayAdapter } from './mock';
 import { getAppToken, ebayApiBase } from './oauth';
+import { buildFixedPriceItemXml } from './listing-xml';
+import { tradingRequest } from './trading';
 
 interface BrowseItemSummary {
   itemId?: string;
@@ -34,12 +36,23 @@ export class LiveEbayAdapter implements EbayAdapter {
     }
   }
 
-  verifyListing(_input: PublishListingInput): Promise<VerifyResult> {
-    throw new Error('verifyListing not wired yet');
+  async verifyListing(input: PublishListingInput): Promise<VerifyResult> {
+    const res = await tradingRequest(
+      'VerifyAddFixedPriceItem',
+      buildFixedPriceItemXml(input, { verify: true }),
+    );
+    return { ok: res.ack === 'Success' || res.ack === 'Warning', errors: res.errors };
   }
 
-  publishListing(_input: PublishListingInput): Promise<PublishResult> {
-    throw new Error('publishListing not wired yet');
+  async publishListing(input: PublishListingInput): Promise<PublishResult> {
+    const res = await tradingRequest(
+      'AddFixedPriceItem',
+      buildFixedPriceItemXml(input, { verify: false }),
+    );
+    if ((res.ack !== 'Success' && res.ack !== 'Warning') || !res.itemId) {
+      throw new Error(res.errors.join('; ') || `eBay AddFixedPriceItem returned ${res.ack}`);
+    }
+    return { ebayListingId: res.itemId, url: `https://www.ebay.com/itm/${res.itemId}` };
   }
 
   private async browseComps(identity: ItemIdentity): Promise<Comp[]> {
