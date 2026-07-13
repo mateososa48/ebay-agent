@@ -5,6 +5,7 @@ import { PricePanel } from '@/components/review/price-panel';
 import { ListingBody } from '@/components/review/listing-body';
 import { LinterPanel } from '@/components/review/linter-panel';
 import { ActionBar } from '@/components/review/action-bar';
+import { ReviewAssistant } from '@/components/review/review-assistant';
 import { Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
 import { SAMPLE_LISTING, type ListingDetail } from '@/lib/sample-listing';
@@ -76,6 +77,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           />
         </div>
       </div>
+
+      <ReviewAssistant listing={l} disabled={real === null} />
     </AppShell>
   );
 }

@@ -7,6 +7,7 @@ import { getEbayAdapter, isLiveBackend } from '@/lib/ebay';
 import { suggestCategoryId } from '@/lib/ebay/category';
 import { getSellerPostalCode } from '@/lib/ebay/trading';
 import { publishApprovedListing, type PublishOutcome } from '@/lib/agent/steps/publish';
+import { applyListingEdit, type ListingEdit, type EditResult } from '@/lib/agent/steps/editListing';
 import { getPendingApprovalByRef, decideApproval } from '@/lib/db/repos/approvals';
 import { getListing } from '@/lib/db/repos/listings';
 import { updateItemStatus } from '@/lib/db/repos/items';
@@ -36,4 +37,11 @@ export async function rejectListingAction(listingId: string): Promise<{ ok: bool
   await recordEvent(db, { itemId: listing.itemId, kind: 'sent_back', data: { listingId } });
   revalidatePath(`/listings/${listingId}`);
   return { ok: true };
+}
+
+/** Direct edit from the review screen's controls (price/title/description/specifics). */
+export async function updateListingAction(listingId: string, edit: ListingEdit): Promise<EditResult> {
+  const res = await applyListingEdit(getDb(), listingId, edit);
+  if (res.ok) revalidatePath(`/listings/${listingId}`);
+  return res;
 }
