@@ -70,3 +70,12 @@ export async function decideApproval(
     [id, decision],
   );
 }
+
+export async function getPendingApprovalByRef(db: Db, refId: string): Promise<ApprovalRow | null> {
+  const { rows } = await db.query<RawApproval>(
+    `select * from approvals where ref_id = $1 and state = 'pending' order by created_at desc, ctid desc limit 1`,
+    [refId],
+  );
+  const row = rows[0];
+  return row ? mapApproval(row) : null;
+}
