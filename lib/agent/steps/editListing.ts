@@ -28,10 +28,12 @@ export async function applyListingEdit(db: Db, listingId: string, edit: ListingE
     return { ok: false, errors: ['This listing is already live on eBay — edit it there.'] };
   }
 
-  // Merge the edit over the current values, then lint the would-be result.
+  // Merge aspects PER-KEY (never replace the whole map — that would silently drop
+  // every specific the caller didn't re-send), then lint the would-be result.
+  const mergedAspects = edit.aspects ? { ...listing.specifics, ...edit.aspects } : listing.specifics;
   const merged = {
     title: edit.title ?? listing.title,
-    aspects: edit.aspects ?? listing.specifics,
+    aspects: mergedAspects,
     description: edit.description ?? listing.description,
     price: edit.price ?? listing.price ?? 0,
     condition: (edit.condition ?? (listing.condition as ItemCondition) ?? 'used_good') as ItemCondition,
@@ -45,7 +47,7 @@ export async function applyListingEdit(db: Db, listingId: string, edit: ListingE
     title: edit.title,
     price: edit.price,
     description: edit.description,
-    specifics: edit.aspects,
+    specifics: edit.aspects ? mergedAspects : undefined,
     condition: edit.condition,
     linterReport: linter,
   });

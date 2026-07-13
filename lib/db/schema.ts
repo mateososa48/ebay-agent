@@ -68,6 +68,11 @@ export const SCHEMA_STATEMENTS: string[] = [
      updated_at timestamptz not null default now(),
      constraint ebay_connection_singleton check (id = 1)
    )`,
+  `create table if not exists app_settings (
+     key text primary key,
+     value text not null,
+     updated_at timestamptz not null default now()
+   )`,
   `create index if not exists idx_listings_item on listings(item_id)`,
   `create index if not exists idx_comps_item on comps(item_id)`,
   `create index if not exists idx_approvals_state on approvals(state)`,

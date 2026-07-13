@@ -6,6 +6,10 @@ import { Button, Card, Eyebrow, Pill } from '@/components/ui/primitives';
 import { Toggle } from '@/components/ui/toggle';
 import { Icon } from '@/components/ui/icons';
 import { getEbayStatus } from '@/lib/queries';
+import { getDb } from '@/lib/db/client';
+import { getSetting } from '@/lib/db/repos/settings';
+import { getAiSpend } from '@/lib/ai/spend';
+import { ModelSelector } from '@/components/settings/model-selector';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +39,8 @@ function Row({ label, hint, control }: { label: string; hint: string; control: R
 
 export default async function SettingsPage() {
   const ebay = await getEbayStatus();
+  const model = (await getSetting(getDb(), 'model')) ?? 'openai/gpt-5.4';
+  const spend = await getAiSpend();
 
   return (
     <AppShell>
@@ -122,11 +128,9 @@ export default async function SettingsPage() {
             <div className="flex items-center justify-between border-b border-hairline pb-4">
               <div>
                 <div className="text-[14px] font-medium text-ink">Writing model</div>
-                <div className="mt-0.5 text-[13px] text-ink-muted">Add AI Gateway credits to switch to Opus 4.8</div>
+                <div className="mt-0.5 text-[13px] text-ink-muted">The model that identifies, prices, and writes — switches live.</div>
               </div>
-              <span className="rounded-full border border-hairline bg-surface-2 px-3 py-1.5 font-mono text-[12px] text-ink">
-                openai/gpt-5.4-mini
-              </span>
+              <ModelSelector current={model} />
             </div>
             <div className="flex items-center justify-between pt-4">
               <div>
@@ -138,6 +142,42 @@ export default async function SettingsPage() {
                 Active
               </span>
             </div>
+          </Card>
+        </Section>
+
+        <Section title="AI spend" desc="What you've spent running the agent on the AI Gateway.">
+          <Card className="p-5">
+            {spend.available ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[14px] font-medium text-ink">Used so far</div>
+                  <div className="mt-0.5 text-[13px] text-ink-muted">Across every agent run and chat</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-display text-[26px] font-bold leading-none text-ink tnum">
+                    ${(spend.used ?? 0).toFixed(2)}
+                  </div>
+                  {spend.balance != null && (
+                    <div className="mt-1 text-[12px] text-ink-muted tnum">${spend.balance.toFixed(2)} left</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-[13px] leading-relaxed text-ink-muted">
+                To show your live balance here, add an{' '}
+                <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[12px] text-ink">AI_GATEWAY_API_KEY</code>{' '}
+                env var (from your Vercel AI Gateway settings). Your exact spend is always in the{' '}
+                <a
+                  href="https://vercel.com/d?to=%2F%5Bteam%5D%2F~%2Fai"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-ink underline"
+                >
+                  AI Gateway dashboard
+                </a>
+                .
+              </div>
+            )}
           </Card>
         </Section>
       </div>

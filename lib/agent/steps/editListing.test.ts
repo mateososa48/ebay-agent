@@ -39,6 +39,18 @@ describe('applyListingEdit', () => {
     expect((await getListing(db, l.id))?.description).toBe('clean and honest');
   });
 
+  it('merges item specifics per-key instead of replacing the whole map', async () => {
+    db = await makeTestDb();
+    const item = await createItem(db, { photos: [] });
+    const l = await createListing(db, {
+      itemId: item.id, title: 'T', specifics: { Brand: 'X', Size: 'M' },
+      description: 'clean honest desc', price: 10, condition: 'used_good',
+    });
+    const res = await applyListingEdit(db, l.id, { aspects: { Color: 'Red' } });
+    expect(res.ok).toBe(true);
+    expect((await getListing(db, l.id))?.specifics).toEqual({ Brand: 'X', Size: 'M', Color: 'Red' });
+  });
+
   it('refuses editing a listing that is already live', async () => {
     db = await makeTestDb();
     const l = await seed(db);

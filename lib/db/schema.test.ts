@@ -8,13 +8,13 @@ describe('applySchema', () => {
     db = undefined;
   });
 
-  it('creates all six tables', async () => {
+  it('creates all the core tables', async () => {
     db = await makeTestDb();
     const { rows } = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
     const names = rows.map((r) => r.table_name);
-    expect(names).toEqual(['approvals', 'comps', 'ebay_connection', 'events', 'items', 'listings']);
+    expect(names).toEqual(['app_settings', 'approvals', 'comps', 'ebay_connection', 'events', 'items', 'listings']);
   });
 
   it('is idempotent (safe to apply twice)', async () => {

@@ -11,7 +11,10 @@ export default defineTool({
     title: z.string().optional(),
     price: z.number().optional(),
     description: z.string().optional(),
-    aspects: z.record(z.string(), z.string()).optional().describe('Item specifics to set/replace'),
+    aspects: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe('Item specifics to add or change — merged into the existing ones per key, so pass only the specifics you want to set/update; omitted ones are kept.'),
     condition: z.enum(['new', 'open_box', 'used_like_new', 'used_good', 'used_fair', 'for_parts']).optional(),
   }),
   async execute({ listingId, ...edit }) {

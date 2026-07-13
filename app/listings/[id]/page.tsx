@@ -60,8 +60,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
       </header>
 
       <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <div className="lg:sticky lg:top-8">
+        <div className="space-y-5">
           <Gallery photos={l.photos} title={l.title} />
+          <ReviewAssistant listing={l} disabled={real === null} />
         </div>
 
         <div className="space-y-5">
@@ -77,8 +78,6 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           />
         </div>
       </div>
-
-      <ReviewAssistant listing={l} disabled={real === null} />
     </AppShell>
   );
 }
