@@ -1,0 +1,65 @@
+// lib/ebay/trading.ts
+import { ebayApiBase, getUserAccessToken } from './oauth';
+
+export interface TradingResponse {
+  ack: string;
+  itemId?: string;
+  errors: string[]; // Error-severity LongMessages
+}
+
+const TRADING_COMPAT_LEVEL = '1193';
+
+/** Pull Ack/ItemID and Error-severity messages out of a Trading XML response. */
+export function parseTradingResponse(xml: string): TradingResponse {
+  const ack = xml.match(/<Ack>(\w+)<\/Ack>/)?.[1] ?? 'Unknown';
+  const itemId = xml.match(/<ItemID>(\d+)<\/ItemID>/)?.[1];
+  const errors: string[] = [];
+  for (const block of xml.match(/<Errors>[\s\S]*?<\/Errors>/g) ?? []) {
+    const severity = block.match(/<SeverityCode>(\w+)<\/SeverityCode>/)?.[1];
+    if (severity && severity !== 'Error') continue;
+    const msg = block.match(/<LongMessage>([\s\S]*?)<\/LongMessage>/)?.[1]
+      ?? block.match(/<ShortMessage>([\s\S]*?)<\/ShortMessage>/)?.[1];
+    if (msg) errors.push(msg.trim());
+  }
+  return { ack, itemId, errors };
+}
+
+export function parseGetUserPostalCode(xml: string): string | null {
+  return xml.match(/<PostalCode>([^<]+)<\/PostalCode>/)?.[1]?.trim() ?? null;
+}
+
+/** POST a Trading API call with the user OAuth token (IAF header). */
+export async function tradingRequest(callName: string, body: string): Promise<TradingResponse> {
+  const token = await getUserAccessToken();
+  const res = await fetch(`${ebayApiBase()}/ws/api.dll`, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-CALL-NAME': callName,
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': TRADING_COMPAT_LEVEL,
+      'X-EBAY-API-IAF-TOKEN': token,
+      'Content-Type': 'text/xml',
+    },
+    body,
+  });
+  const xml = await res.text();
+  return parseTradingResponse(xml);
+}
+
+/** The connected seller's registration ZIP, or null if eBay doesn't return one. */
+export async function getSellerPostalCode(): Promise<string | null> {
+  const token = await getUserAccessToken();
+  const res = await fetch(`${ebayApiBase()}/ws/api.dll`, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-CALL-NAME': 'GetUser',
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': TRADING_COMPAT_LEVEL,
+      'X-EBAY-API-IAF-TOKEN': token,
+      'Content-Type': 'text/xml',
+    },
+    body: `<?xml version="1.0" encoding="utf-8"?>
+<GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents"><DetailLevel>ReturnAll</DetailLevel></GetUserRequest>`,
+  });
+  return parseGetUserPostalCode(await res.text());
+}
