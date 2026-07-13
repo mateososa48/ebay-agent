@@ -1,4 +1,5 @@
 import type { Db } from '../types';
+import type { ItemCondition } from '../../types';
 
 export interface ListingRow {
   id: string;
@@ -11,6 +12,8 @@ export interface ListingRow {
   ebayListingId: string | null;
   status: string;
   linterReport: unknown;
+  condition: string | null;
+  ebayCategoryId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +29,8 @@ interface RawListing {
   ebay_listing_id: string | null;
   status: string;
   linter_report: unknown;
+  condition: string | null;
+  ebay_category_id: string | null;
   created_at: string | Date;
   updated_at: string | Date;
 }
@@ -43,6 +48,8 @@ function mapListing(r: RawListing): ListingRow {
     ebayListingId: r.ebay_listing_id,
     status: r.status,
     linterReport: r.linter_report,
+    condition: r.condition,
+    ebayCategoryId: r.ebay_category_id,
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
   };
@@ -57,11 +64,12 @@ export async function createListing(
     description: string;
     price: number | null;
     priceRange?: unknown;
+    condition?: ItemCondition;
   },
 ): Promise<ListingRow> {
   const { rows } = await db.query<RawListing>(
-    `insert into listings (item_id, title, specifics, description, price, price_range)
-     values ($1, $2, $3::jsonb, $4, $5, $6::jsonb)
+    `insert into listings (item_id, title, specifics, description, price, price_range, condition)
+     values ($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7)
      returning *`,
     [
       input.itemId,
@@ -70,6 +78,7 @@ export async function createListing(
       input.description,
       input.price,
       JSON.stringify(input.priceRange ?? null),
+      input.condition ?? null,
     ],
   );
   const row = rows[0];
@@ -110,6 +119,8 @@ export interface ListingUpdate {
   status?: string;
   ebayListingId?: string | null;
   linterReport?: unknown;
+  condition?: string;
+  ebayCategoryId?: string | null;
 }
 
 export async function updateListing(db: Db, id: string, patch: ListingUpdate): Promise<void> {
@@ -127,6 +138,8 @@ export async function updateListing(db: Db, id: string, patch: ListingUpdate): P
   if (patch.status !== undefined) add('status', patch.status);
   if (patch.ebayListingId !== undefined) add('ebay_listing_id', patch.ebayListingId);
   if (patch.linterReport !== undefined) add('linter_report', JSON.stringify(patch.linterReport), '::jsonb');
+  if (patch.condition !== undefined) add('condition', patch.condition);
+  if (patch.ebayCategoryId !== undefined) add('ebay_category_id', patch.ebayCategoryId);
   if (sets.length === 0) return;
   sets.push('updated_at = now()');
   await db.query(`update listings set ${sets.join(', ')} where id = $1`, params);

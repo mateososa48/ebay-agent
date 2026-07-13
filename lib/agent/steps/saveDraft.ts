@@ -25,6 +25,7 @@ export async function saveListingDraft(db: Db, itemId: string, draft: ListingDra
     specifics: draft.aspects,
     description: draft.description,
     price: draft.price,
+    condition: draft.condition,
   });
   await updateListing(db, listing.id, { linterReport: linter });
   const approval = await enqueueApproval(db, { type: 'listing', refId: listing.id });

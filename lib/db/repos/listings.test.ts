@@ -55,3 +55,22 @@ describe('listings repo', () => {
     expect(all.map((l) => l.id).slice(0, 2)).toEqual([b.id, a.id]);
   });
 });
+
+describe('listings condition + category', () => {
+  let db: TestDb;
+  afterEach(async () => { await db.close(); });
+
+  it('persists condition on create and category on update', async () => {
+    db = await makeTestDb();
+    const item = await createItem(db, { photos: [] });
+    const l = await createListing(db, {
+      itemId: item.id, title: 'T', specifics: {}, description: 'd',
+      price: 10, condition: 'used_good',
+    });
+    expect(l.condition).toBe('used_good');
+    await updateListing(db, l.id, { ebayCategoryId: '11483', status: 'live', ebayListingId: '42' });
+    const after = await getListing(db, l.id);
+    expect(after?.ebayCategoryId).toBe('11483');
+    expect(after?.status).toBe('live');
+  });
+});
