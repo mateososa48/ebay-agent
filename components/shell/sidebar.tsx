@@ -9,13 +9,13 @@ import { cn } from '@/lib/ui/cn';
 import { ThemeToggle } from './theme-toggle';
 
 const NAV = [
-  { href: '/', label: 'Review Queue', icon: Icon.Queue, badge: 4 },
+  { href: '/', label: 'Review Queue', icon: Icon.Queue },
   { href: '/new', label: 'New Item', icon: Icon.Camera },
   { href: '/listings', label: 'Listings', icon: Icon.Grid },
   { href: '/settings', label: 'Settings', icon: Icon.Sliders },
 ] as const;
 
-export function Sidebar() {
+export function Sidebar({ pendingCount = 0, connected = false }: { pendingCount?: number; connected?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -35,10 +35,17 @@ export function Sidebar() {
             <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">via</span>
             <EbayMark className="text-[15px]" />
             <span className="h-3 w-px bg-hairline-strong" />
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-muted">
-              <Dot tone="green" pulse />
-              Connected
-            </span>
+            {connected ? (
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-muted">
+                <Dot tone="green" pulse />
+                Connected
+              </span>
+            ) : (
+              <Link href="/settings" className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink">
+                <Dot tone="yellow" />
+                Connect
+              </Link>
+            )}
           </span>
         </div>
       </div>
@@ -63,9 +70,9 @@ export function Sidebar() {
                   )}
                   <IconCmp className={cn('size-[19px]', active ? 'text-[var(--ebay-blue)]' : 'text-ink-faint group-hover:text-ink-muted')} />
                   <span className="flex-1">{item.label}</span>
-                  {'badge' in item && item.badge ? (
+                  {item.href === '/' && pendingCount > 0 ? (
                     <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[var(--ebay-red)] px-1.5 text-[11px] font-semibold text-white tabular-nums">
-                      {item.badge}
+                      {pendingCount}
                     </span>
                   ) : null}
                 </Link>

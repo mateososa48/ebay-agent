@@ -1,5 +1,10 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Eyebrow, Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
+import { updateListingAction } from '@/app/listings/[id]/actions';
 import type { CompRow } from '@/lib/sample-listing';
 
 export function PricePanel({
@@ -7,17 +12,45 @@ export function PricePanel({
   compLow,
   compHigh,
   comps,
+  listingId,
+  editable,
 }: {
   price: number;
   compLow: number;
   compHigh: number;
   comps: CompRow[];
+  listingId: string;
+  editable?: boolean;
 }) {
+  const router = useRouter();
+  const [, start] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(price));
+  const [err, setErr] = useState<string | null>(null);
+
   const min = compLow;
   const max = compHigh;
   const span = Math.max(1, max - min);
   const pct = (v: number) => Math.min(98, Math.max(2, ((v - min) / span) * 100));
   const afterFees = Math.round(price * 0.871);
+
+  function save() {
+    setEditing(false);
+    const n = Number(val);
+    if (!n || n === price) {
+      setVal(String(price));
+      return;
+    }
+    setErr(null);
+    start(async () => {
+      const r = await updateListingAction(listingId, { price: n });
+      if (r.ok) router.refresh();
+      else {
+        setErr(r.errors.join(' '));
+        setVal(String(price));
+      }
+    });
+  }
 
   return (
     <Card className="reveal p-6" style={{ animationDelay: '120ms' }}>
@@ -25,15 +58,43 @@ export function PricePanel({
         <div>
           <Eyebrow>Suggested price</Eyebrow>
           <div className="mt-2.5 flex items-baseline gap-3">
-            <span className="font-display text-[42px] font-bold leading-none text-ink tnum">${price}</span>
-            <button className="inline-flex items-center gap-1 rounded-full border border-hairline px-2.5 py-1 text-[12px] font-medium text-ink-muted transition-colors hover:border-hairline-strong hover:text-ink">
-              <Icon.Pencil className="size-3.5" />
-              Adjust
-            </button>
+            {editing ? (
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display text-[30px] font-bold text-ink">$</span>
+                <input
+                  autoFocus
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={val}
+                  onChange={(e) => setVal(e.target.value)}
+                  onBlur={save}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') save();
+                    if (e.key === 'Escape') { setVal(String(price)); setEditing(false); }
+                  }}
+                  className="w-32 rounded-xl border border-[var(--ebay-blue)] bg-surface px-3 py-1 font-display text-[30px] font-bold text-ink outline-none tnum"
+                />
+              </div>
+            ) : (
+              <>
+                <span className="font-display text-[42px] font-bold leading-none text-ink tnum">${price}</span>
+                {editable && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="inline-flex items-center gap-1 rounded-full border border-hairline px-2.5 py-1 text-[12px] font-medium text-ink-muted transition-colors hover:border-hairline-strong hover:text-ink"
+                  >
+                    <Icon.Pencil className="size-3.5" />
+                    Adjust
+                  </button>
+                )}
+              </>
+            )}
           </div>
           <div className="mt-2 text-[13px] text-ink-muted tnum">
             ≈ <span className="font-medium text-ink">${afterFees}</span> in your pocket after fees
           </div>
+          {err && <div className="mt-1 text-[12px]" style={{ color: 'var(--ebay-red)' }}>{err}</div>}
         </div>
         <Pill tone="green" icon={<Icon.Trend className="size-3.5" />}>
           From comps
@@ -60,10 +121,7 @@ export function PricePanel({
               style={{ left: `${pct(c.price)}%`, background: 'var(--ebay-green)' }}
             />
           ))}
-          <div
-            className="absolute top-0 flex -translate-x-1/2 flex-col items-center"
-            style={{ left: `${pct(price)}%` }}
-          >
+          <div className="absolute top-0 flex -translate-x-1/2 flex-col items-center" style={{ left: `${pct(price)}%` }}>
             <span className="whitespace-nowrap rounded-md bg-ink px-2 py-0.5 text-[12px] font-semibold text-paper tnum">
               You · ${price}
             </span>

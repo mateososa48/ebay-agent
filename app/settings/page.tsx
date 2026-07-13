@@ -3,13 +3,13 @@ import Link from 'next/link';
 import { AppShell } from '@/components/shell/app-shell';
 import { EbayMark } from '@/components/brand/ebay-mark';
 import { Button, Card, Eyebrow, Pill } from '@/components/ui/primitives';
-import { Toggle } from '@/components/ui/toggle';
 import { Icon } from '@/components/ui/icons';
 import { getEbayStatus } from '@/lib/queries';
 import { getDb } from '@/lib/db/client';
-import { getSetting } from '@/lib/db/repos/settings';
+import { getSetting, getListingDefaults } from '@/lib/db/repos/settings';
 import { getAiSpend } from '@/lib/ai/spend';
 import { ModelSelector } from '@/components/settings/model-selector';
+import { ListingDefaultsForm } from '@/components/settings/listing-defaults';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,22 +25,11 @@ function Section({ title, desc, children }: { title: string; desc: string; child
   );
 }
 
-function Row({ label, hint, control }: { label: string; hint: string; control: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-6 border-b border-hairline py-4 last:border-0">
-      <div>
-        <div className="text-[14px] font-medium text-ink">{label}</div>
-        <div className="mt-0.5 text-[13px] text-ink-muted">{hint}</div>
-      </div>
-      {control}
-    </div>
-  );
-}
-
 export default async function SettingsPage() {
   const ebay = await getEbayStatus();
   const model = (await getSetting(getDb(), 'model')) ?? 'openai/gpt-5.4';
   const spend = await getAiSpend();
+  const defaults = await getListingDefaults(getDb());
 
   return (
     <AppShell>
@@ -103,23 +92,18 @@ export default async function SettingsPage() {
           </Card>
         </Section>
 
-        <Section title="Automation" desc="How much the agent does on its own. You stay in control of what goes public.">
-          <Card className="px-5 py-1.5">
-            <Row
-              label="Require my approval before publishing"
-              hint="Every listing waits in your queue until you approve it"
-              control={<Toggle defaultOn disabled />}
-            />
-            <Row
-              label="Auto-send offers to interested buyers"
-              hint="Send discounts to watchers without asking first"
-              control={<Toggle />}
-            />
-            <Row
-              label="Auto-reply to routine buyer questions"
-              hint="Answer simple questions; escalate anything unusual to you"
-              control={<Toggle defaultOn />}
-            />
+        <Section title="Listing defaults" desc="Applied to every listing the agent creates — each saves instantly and takes effect on your next publish.">
+          <Card className="p-0">
+            <ListingDefaultsForm defaults={defaults} />
+          </Card>
+        </Section>
+
+        <Section title="Buyer automation" desc="Hands-off selling once your items are live.">
+          <Card className="p-5">
+            <p className="text-[13px] leading-relaxed text-ink-muted">
+              Auto-sending offers to watchers and auto-replying to buyer questions are{' '}
+              <strong className="text-ink">coming soon</strong>. Publishing is live now; the after-it&rsquo;s-listed half is next on the roadmap.
+            </p>
           </Card>
         </Section>
 

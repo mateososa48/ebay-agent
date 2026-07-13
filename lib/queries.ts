@@ -133,6 +133,17 @@ export async function getEbayStatus(): Promise<EbayStatus> {
   }
 }
 
+export async function getPendingApprovalCount(): Promise<number> {
+  try {
+    const { rows } = await getDb().query<{ n: string | number }>(
+      `select count(*) as n from approvals where state = 'pending' and type = 'listing'`,
+    );
+    return Number(rows[0]?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
 export async function getListingCounts(): Promise<{ live: number; sold: number }> {
   const db = getDb();
   const { rows } = await db.query<Row>(

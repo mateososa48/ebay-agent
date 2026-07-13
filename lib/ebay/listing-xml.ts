@@ -30,6 +30,16 @@ export function buildFixedPriceItemXml(
   // A literal ']]>' in seller text would close the CDATA early and corrupt the XML.
   const description = input.description.replace(/]]>/g, ']]]]><![CDATA[>');
 
+  // Shipping / returns / handling come from the seller's Settings (defaults: free, 30-day, 3-day).
+  const handling = input.handlingDays ?? 3;
+  const shipFree = (input.shippingMode ?? 'free') === 'free';
+  const shipCost = shipFree ? '0.00' : (input.shippingCost ?? 0).toFixed(2);
+  const rw = input.returnWindow ?? 'days_30';
+  const returnPolicy =
+    rw === 'none'
+      ? '<ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>'
+      : `<ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption><ReturnsWithinOption>${rw === 'days_60' ? 'Days_60' : 'Days_30'}</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>`;
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <${root} xmlns="urn:ebay:apis:eBLBaseComponents">
   <ErrorLanguage>en_US</ErrorLanguage>
@@ -46,7 +56,7 @@ export function buildFixedPriceItemXml(
     <ListingType>FixedPriceItem</ListingType>
     <Quantity>1</Quantity>
     <PostalCode>${esc(input.postalCode)}</PostalCode>
-    <DispatchTimeMax>3</DispatchTimeMax>
+    <DispatchTimeMax>${handling}</DispatchTimeMax>
     <ItemSpecifics>${specifics}</ItemSpecifics>
     <PictureDetails>${pictures}</PictureDetails>
     <ShippingDetails>
@@ -54,15 +64,11 @@ export function buildFixedPriceItemXml(
       <ShippingServiceOptions>
         <ShippingServicePriority>1</ShippingServicePriority>
         <ShippingService>USPSGroundAdvantage</ShippingService>
-        <ShippingServiceCost currencyID="USD">0.00</ShippingServiceCost>
-        <FreeShipping>true</FreeShipping>
+        <ShippingServiceCost currencyID="USD">${shipCost}</ShippingServiceCost>
+        <FreeShipping>${shipFree ? 'true' : 'false'}</FreeShipping>
       </ShippingServiceOptions>
     </ShippingDetails>
-    <ReturnPolicy>
-      <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
-      <ReturnsWithinOption>Days_30</ReturnsWithinOption>
-      <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
-    </ReturnPolicy>
+    <ReturnPolicy>${returnPolicy}</ReturnPolicy>
   </Item>
 </${root}>`;
 }

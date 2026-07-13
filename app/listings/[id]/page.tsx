@@ -8,7 +8,8 @@ import { ActionBar } from '@/components/review/action-bar';
 import { ReviewAssistant } from '@/components/review/review-assistant';
 import { Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
-import { SAMPLE_LISTING, type ListingDetail } from '@/lib/sample-listing';
+import { notFound } from 'next/navigation';
+import { type ListingDetail } from '@/lib/sample-listing';
 import { getListingDetail } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   } catch {
     real = null;
   }
-  const l = real ?? SAMPLE_LISTING;
+  if (!real) notFound();
+  const l = real;
 
   return (
     <AppShell>
@@ -66,8 +68,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="space-y-5">
-          <PricePanel price={l.price} compLow={l.compLow} compHigh={l.compHigh} comps={l.comps} />
-          <ListingBody listing={l} />
+          <PricePanel price={l.price} compLow={l.compLow} compHigh={l.compHigh} comps={l.comps} listingId={l.id} editable={real !== null} />
+          <ListingBody listing={l} editable={real !== null} />
           <LinterPanel linter={l.linter} />
           <ActionBar
             listingId={l.id}

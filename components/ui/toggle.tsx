@@ -3,14 +3,33 @@
 import { useState } from 'react';
 import { cn } from '@/lib/ui/cn';
 
-export function Toggle({ defaultOn = false, disabled }: { defaultOn?: boolean; disabled?: boolean }) {
-  const [on, setOn] = useState(defaultOn);
+export function Toggle({
+  defaultOn = false,
+  on: controlledOn,
+  disabled,
+  onChange,
+}: {
+  defaultOn?: boolean;
+  on?: boolean;
+  disabled?: boolean;
+  onChange?: (on: boolean) => void;
+}) {
+  const [internalOn, setInternalOn] = useState(defaultOn);
+  const on = controlledOn ?? internalOn;
+
+  function toggle() {
+    const next = !on;
+    if (controlledOn === undefined) setInternalOn(next);
+    onChange?.(next);
+  }
+
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={on}
       disabled={disabled}
-      onClick={() => setOn((v) => !v)}
+      onClick={toggle}
       className={cn(
         'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ease-out',
         on ? 'bg-[var(--ebay-green-deep)]' : 'border border-hairline-strong bg-surface-2',

@@ -21,6 +21,11 @@ export interface PublishListingInput {
   photoUrls: string[]; // public image URLs (Vercel Blob)
   postalCode: string; // ship-from ZIP
   idempotencyKey?: string; // 32-hex UUID; eBay dedupes repeat AddFixedPriceItem calls with the same key
+  // Seller defaults (from Settings). Omitted → free shipping / 30-day returns / 3-day handling.
+  shippingMode?: 'free' | 'flat';
+  shippingCost?: number; // USD, when shippingMode === 'flat'
+  returnWindow?: 'days_30' | 'days_60' | 'none';
+  handlingDays?: number;
 }
 
 export interface VerifyResult {

@@ -5,6 +5,7 @@ import type { ItemCondition } from '../../types';
 import { getListing, updateListing } from '../../db/repos/listings';
 import { getItem, updateItemStatus } from '../../db/repos/items';
 import { getPendingApprovalByRef, decideApproval } from '../../db/repos/approvals';
+import { getListingDefaults } from '../../db/repos/settings';
 import { recordEvent } from '../../db/repos/events';
 
 export interface PublishDeps {
@@ -41,12 +42,31 @@ export async function publishApprovedListing(
   const item = await getItem(db, listing.itemId);
   if (!item) return { ok: false, errors: ['Item not found.'] };
 
-  const categoryId = listing.ebayCategoryId ?? (await deps.resolveCategoryId(listing.title));
+  const defaults = await getListingDefaults(db);
+
+  // Category: use the stored one, else resolve it (wrapped — a transient lookup
+  // failure must surface as a retryable error, not an unhandled server throw).
+  let categoryId = listing.ebayCategoryId;
+  if (!categoryId) {
+    try {
+      categoryId = await deps.resolveCategoryId(listing.title);
+    } catch (e) {
+      return { ok: false, errors: [`Couldn't look up the eBay category (${(e as Error).message}). Try again.`] };
+    }
+  }
   if (!categoryId) return { ok: false, errors: ['Could not determine an eBay category for this item.'] };
   if (!listing.ebayCategoryId) await updateListing(db, listingId, { ebayCategoryId: categoryId });
 
-  const postalCode = await deps.getPostalCode();
-  if (!postalCode) return { ok: false, errors: ['No ship-from ZIP. Set SELLER_POSTAL_CODE or add an address to your eBay account.'] };
+  // Ship-from ZIP: Settings value wins; else read it from the connected account.
+  let postalCode = defaults.shipZip.trim();
+  if (!postalCode) {
+    try {
+      postalCode = (await deps.getPostalCode()) ?? '';
+    } catch (e) {
+      return { ok: false, errors: [`Couldn't read your ship-from ZIP (${(e as Error).message}). Set one in Settings.`] };
+    }
+  }
+  if (!postalCode) return { ok: false, errors: ['No ship-from ZIP. Set one in Settings, or add an address to your eBay account.'] };
 
   if (listing.price === null) return { ok: false, errors: ['Listing has no price.'] };
 
@@ -64,6 +84,10 @@ export async function publishApprovedListing(
     photoUrls: item.photos,
     postalCode,
     idempotencyKey: listing.id.replace(/-/g, ''), // stable 32-hex → eBay dedupes retries
+    shippingMode: defaults.shipMode,
+    shippingCost: defaults.shipCost,
+    returnWindow: defaults.returnWindow,
+    handlingDays: defaults.handlingDays,
   };
 
   let verify;
