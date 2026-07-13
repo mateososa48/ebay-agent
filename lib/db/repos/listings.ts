@@ -119,7 +119,7 @@ export interface ListingUpdate {
   status?: string;
   ebayListingId?: string | null;
   linterReport?: unknown;
-  condition?: string;
+  condition?: ItemCondition;
   ebayCategoryId?: string | null;
 }
 

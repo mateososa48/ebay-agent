@@ -8,24 +8,40 @@ import { publishListingAction, rejectListingAction } from '@/app/listings/[id]/a
 type State =
   | { kind: 'idle' }
   | { kind: 'done'; url: string }
+  | { kind: 'sentback' }
   | { kind: 'errors'; errors: string[] };
 
 export function ActionBar({
-  listingId, price, status, disabled,
-}: { listingId: string; price: number; status: string; disabled?: boolean }) {
+  listingId, price, status, ebayListingId, disabled,
+}: { listingId: string; price: number; status: string; ebayListingId?: string | null; disabled?: boolean }) {
   const [pending, start] = useTransition();
   const [state, setState] = useState<State>(
-    status === 'live' ? { kind: 'done', url: '' } : { kind: 'idle' },
+    status === 'live'
+      ? { kind: 'done', url: ebayListingId ? `https://www.ebay.com/itm/${ebayListingId}` : '' }
+      : { kind: 'idle' },
   );
 
   const publish = () =>
     start(async () => {
-      const r = await publishListingAction(listingId);
-      setState(r.ok ? { kind: 'done', url: r.url } : { kind: 'errors', errors: r.errors });
+      try {
+        const r = await publishListingAction(listingId);
+        setState(r.ok ? { kind: 'done', url: r.url } : { kind: 'errors', errors: r.errors });
+      } catch {
+        setState({ kind: 'errors', errors: ['Publish failed — it may have gone through on eBay. Check your listings before retrying.'] });
+      }
     });
-  const reject = () => start(async () => { await rejectListingAction(listingId); });
+  const reject = () =>
+    start(async () => {
+      try {
+        await rejectListingAction(listingId);
+        setState({ kind: 'sentback' });
+      } catch {
+        setState({ kind: 'errors', errors: ['Could not send this back. Try again.'] });
+      }
+    });
 
   const live = state.kind === 'done';
+  const sentback = state.kind === 'sentback';
 
   return (
     <div className="sticky bottom-6 z-20 mt-8" style={{ animationDelay: '260ms' }}>
@@ -45,6 +61,8 @@ export function ActionBar({
                 </Link>
               )}
             </>
+          ) : sentback ? (
+            <span className="text-[13px] text-ink-muted">Sent back to your queue</span>
           ) : (
             <>
               <span className="text-[13px] text-ink-muted">Goes live at</span>
@@ -54,7 +72,7 @@ export function ActionBar({
           )}
         </div>
 
-        {!live && (
+        {!live && !sentback && (
           <div className="flex items-center gap-2.5">
             <button
               onClick={reject}
@@ -65,7 +83,7 @@ export function ActionBar({
             </button>
             <button
               onClick={publish}
-              disabled={pending || disabled}
+              disabled={pending || disabled || !price}
               className="inline-flex h-10 items-center gap-2 rounded-full px-5 text-[13.5px] font-semibold text-white transition-[transform,filter] hover:-translate-y-px hover:brightness-[1.06] active:scale-[0.97] disabled:opacity-60"
               style={{
                 background: 'var(--ebay-green-deep)',

@@ -25,14 +25,18 @@ export function buildFixedPriceItemXml(
   const pictures = input.photoUrls
     .map((u) => `<PictureURL>${esc(u)}</PictureURL>`)
     .join('');
+  // eBay dedupes repeat submissions carrying the same Item UUID from one seller.
+  const uuid = input.idempotencyKey ? `\n    <UUID>${esc(input.idempotencyKey)}</UUID>` : '';
+  // A literal ']]>' in seller text would close the CDATA early and corrupt the XML.
+  const description = input.description.replace(/]]>/g, ']]]]><![CDATA[>');
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <${root} xmlns="urn:ebay:apis:eBLBaseComponents">
   <ErrorLanguage>en_US</ErrorLanguage>
   <WarningLevel>High</WarningLevel>
-  <Item>
+  <Item>${uuid}
     <Title>${esc(input.title)}</Title>
-    <Description><![CDATA[${input.description}]]></Description>
+    <Description><![CDATA[${description}]]></Description>
     <PrimaryCategory><CategoryID>${esc(input.categoryId)}</CategoryID></PrimaryCategory>
     <StartPrice currencyID="USD">${input.price.toFixed(2)}</StartPrice>
     <ConditionID>${conditionToEbayId(input.condition)}</ConditionID>

@@ -3,7 +3,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { makeTestDb, type TestDb } from '../../db/testdb';
 import { createItem, getItem } from '../../db/repos/items';
 import { createListing, getListing } from '../../db/repos/listings';
-import { enqueueApproval, getApproval } from '../../db/repos/approvals';
+import { enqueueApproval, getApproval, decideApproval } from '../../db/repos/approvals';
+import { listEventsByItem } from '../../db/repos/events';
 import { MockEbayAdapter } from '../../ebay/mock';
 import type { EbayAdapter } from '../../ebay/types';
 import { publishApprovedListing } from './publish';
@@ -45,6 +46,32 @@ describe('publishApprovedListing', () => {
     });
     const res = await publishApprovedListing(db, failing, listing.id, DEPS);
     expect(res).toEqual({ ok: false, errors: ['Brand required'] });
+    expect((await getListing(db, listing.id))?.status).toBe('draft');
+  });
+
+  it('on publish failure: records publish_failed and advances no state', async () => {
+    db = await makeTestDb();
+    const { item, listing, approval } = await seed(db);
+    const failing: EbayAdapter = Object.assign(new MockEbayAdapter(), {
+      publishListing: async () => { throw new Error('eBay down'); },
+    });
+    const res = await publishApprovedListing(db, failing, listing.id, DEPS);
+    expect(res).toEqual({ ok: false, errors: ['eBay down'] });
+    const after = await getListing(db, listing.id);
+    expect(after?.status).toBe('draft');
+    expect(after?.ebayListingId).toBeNull();
+    expect((await getItem(db, item.id))?.status).not.toBe('listed');
+    expect((await getApproval(db, approval.id))?.state).toBe('pending');
+    const events = await listEventsByItem(db, item.id);
+    expect(events.some((e) => e.kind === 'publish_failed')).toBe(true);
+  });
+
+  it('fails closed when there is no pending approval', async () => {
+    db = await makeTestDb();
+    const { listing, approval } = await seed(db);
+    await decideApproval(db, approval.id, 'rejected');
+    const res = await publishApprovedListing(db, new MockEbayAdapter(), listing.id, DEPS);
+    expect(res.ok).toBe(false);
     expect((await getListing(db, listing.id))?.status).toBe('draft');
   });
 });

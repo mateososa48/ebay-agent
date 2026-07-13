@@ -148,7 +148,7 @@ export async function getListingCounts(): Promise<{ live: number; sold: number }
 export async function getListingDetail(listingId: string): Promise<ListingDetail | null> {
   const db = getDb();
   const { rows } = await db.query<Row>(
-    `select l.id, l.title, l.price, l.specifics, l.description, l.linter_report, l.status,
+    `select l.id, l.title, l.price, l.specifics, l.description, l.linter_report, l.status, l.ebay_listing_id,
             i.id as item_id, i.photos, i.identity, i.condition
        from listings l join items i on i.id = l.item_id
       where l.id = $1`,
@@ -180,6 +180,7 @@ export async function getListingDetail(listingId: string): Promise<ListingDetail
     category: categoryLabel(r.identity),
     condition: conditionLabel(r.condition),
     status: String(r.status),
+    ebayListingId: r.ebay_listing_id ? String(r.ebay_listing_id) : null,
     confidence: identity?.confidence ?? 0.8,
     photos: photos.length > 0 ? photos : [''],
     price: Number(r.price ?? 0),

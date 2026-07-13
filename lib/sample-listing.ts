@@ -11,6 +11,7 @@ export interface ListingDetail {
   category: string;
   condition: string;
   status: string;
+  ebayListingId: string | null;
   confidence: number;
   photos: string[];
   price: number;
@@ -34,6 +35,7 @@ export const SAMPLE_LISTING: ListingDetail = {
   category: 'Cameras & Photo › Film Cameras',
   condition: 'Used · Like New',
   status: 'draft',
+  ebayListingId: null,
   confidence: 0.94,
   photos: [img('contaxt2a'), img('contaxt2b'), img('contaxt2c'), img('contaxt2d'), img('contaxt2e')],
   price: 749,

@@ -51,4 +51,14 @@ describe('buildFixedPriceItemXml', () => {
     expect(xml).toContain('<FreeShipping>true</FreeShipping>');
     expect(xml).toContain('<ReturnsWithinOption>Days_30</ReturnsWithinOption>');
   });
+  it('emits a UUID only when idempotencyKey is set', () => {
+    expect(buildFixedPriceItemXml({ ...INPUT, idempotencyKey: 'abc123' }, { verify: false }))
+      .toContain('<UUID>abc123</UUID>');
+    expect(buildFixedPriceItemXml(INPUT, { verify: false })).not.toContain('<UUID>');
+  });
+  it('neutralizes a CDATA terminator in the description', () => {
+    const xml = buildFixedPriceItemXml({ ...INPUT, description: 'code: foo]]>bar' }, { verify: false });
+    expect(xml).not.toContain('foo]]>bar');
+    expect(xml).toContain(']]]]><![CDATA[>');
+  });
 });

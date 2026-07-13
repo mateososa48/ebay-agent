@@ -20,6 +20,7 @@ export interface PublishListingInput {
   aspects: Record<string, string>; // item specifics
   photoUrls: string[]; // public image URLs (Vercel Blob)
   postalCode: string; // ship-from ZIP
+  idempotencyKey?: string; // 32-hex UUID; eBay dedupes repeat AddFixedPriceItem calls with the same key
 }
 
 export interface VerifyResult {

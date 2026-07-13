@@ -67,7 +67,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           <PricePanel price={l.price} compLow={l.compLow} compHigh={l.compHigh} comps={l.comps} />
           <ListingBody listing={l} />
           <LinterPanel linter={l.linter} />
-          <ActionBar listingId={l.id} price={l.price} status={l.status} disabled={real === null} />
+          <ActionBar
+            listingId={l.id}
+            price={l.price}
+            status={l.status}
+            ebayListingId={l.ebayListingId}
+            disabled={real === null}
+          />
         </div>
       </div>
     </AppShell>

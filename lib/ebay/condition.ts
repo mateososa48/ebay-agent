@@ -11,5 +11,6 @@ export function conditionToEbayId(condition: ItemCondition): number {
     case 'used_good':
     case 'used_fair': return 3000;
     case 'for_parts': return 7000;
+    default: return 3000; // belt-and-suspenders for out-of-union values from free-text DB columns
   }
 }
