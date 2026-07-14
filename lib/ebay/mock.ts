@@ -8,6 +8,8 @@ import type {
   EbayBuyerQuestion,
   BuyerReplyInput,
   SendOfferInput,
+  EbayActiveListing,
+  EbayItemDetails,
 } from './types';
 import type { ItemIdentity, Comp } from '../types';
 
@@ -90,6 +92,18 @@ export class MockEbayAdapter implements EbayAdapter {
   }
 
   async sendOfferToInterestedBuyers(_input: SendOfferInput): Promise<void> {
+    /* no-op */
+  }
+
+  async getActiveListings(): Promise<EbayActiveListing[]> {
+    return [];
+  }
+
+  async getItemDetails(_ebayListingId: string): Promise<EbayItemDetails | null> {
+    return null;
+  }
+
+  async reviseListingPrice(_input: { ebayListingId: string; priceUsd: number }): Promise<void> {
     /* no-op */
   }
 }

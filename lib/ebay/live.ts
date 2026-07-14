@@ -8,12 +8,22 @@ import type {
   EbayBuyerQuestion,
   BuyerReplyInput,
   SendOfferInput,
+  EbayActiveListing,
+  EbayItemDetails,
 } from './types';
 import type { ItemIdentity, Comp } from '../types';
 import { MockEbayAdapter } from './mock';
 import { getAppToken, ebayApiBase } from './oauth';
 import { buildFixedPriceItemXml } from './listing-xml';
-import { tradingRequest, getRecentSales, getBuyerQuestions, replyToBuyerQuestion } from './trading';
+import {
+  tradingRequest,
+  getRecentSales,
+  getBuyerQuestions,
+  replyToBuyerQuestion,
+  getActiveListings,
+  getItemDetails,
+  reviseListingPrice,
+} from './trading';
 import { getEligibleOfferListingIds, sendOfferToInterestedBuyers } from './negotiation';
 
 interface BrowseItemSummary {
@@ -84,6 +94,18 @@ export class LiveEbayAdapter implements EbayAdapter {
 
   sendOfferToInterestedBuyers(input: SendOfferInput): Promise<void> {
     return sendOfferToInterestedBuyers(input);
+  }
+
+  getActiveListings(): Promise<EbayActiveListing[]> {
+    return getActiveListings();
+  }
+
+  getItemDetails(ebayListingId: string): Promise<EbayItemDetails | null> {
+    return getItemDetails(ebayListingId);
+  }
+
+  reviseListingPrice(input: { ebayListingId: string; priceUsd: number }): Promise<void> {
+    return reviseListingPrice(input);
   }
 
   private async browseComps(identity: ItemIdentity): Promise<Comp[]> {

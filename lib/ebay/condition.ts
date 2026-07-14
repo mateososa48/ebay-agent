@@ -14,3 +14,13 @@ export function conditionToEbayId(condition: ItemCondition): number {
     default: return 3000; // belt-and-suspenders for out-of-union values from free-text DB columns
   }
 }
+
+/** Reverse map for imports: eBay ConditionID → our closest grade. */
+export function ebayIdToCondition(id: number | null): ItemCondition {
+  if (id == null) return 'used_good';
+  if (id === 1000) return 'new';
+  if (id > 1000 && id < 2000) return 'open_box'; // 1500 new-other, 1750 with-defects
+  if (id >= 2000 && id < 3000) return 'used_like_new'; // refurbished band
+  if (id >= 7000) return 'for_parts';
+  return 'used_good'; // 3000-6000 used band
+}

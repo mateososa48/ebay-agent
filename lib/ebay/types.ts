@@ -66,6 +66,25 @@ export interface SendOfferInput {
   message?: string;
 }
 
+/** A live listing on the seller's account (Trading GetMyeBaySelling ActiveList). */
+export interface EbayActiveListing {
+  ebayListingId: string;
+  title: string;
+  price: number; // current price, USD
+}
+
+/** Full details of one eBay listing (Trading GetItem) — used to import it. */
+export interface EbayItemDetails {
+  ebayListingId: string;
+  title: string;
+  description: string; // HTML as eBay returns it
+  price: number;
+  photoUrls: string[];
+  categoryId: string | null;
+  conditionId: number | null;
+  specifics: Record<string, string>;
+}
+
 /**
  * The single seam between the agent and eBay. Two implementations exist:
  * `mock` (deterministic fixtures, used everywhere until the keyset lands) and
@@ -87,4 +106,10 @@ export interface EbayAdapter {
   getEligibleOfferListingIds(): Promise<string[]>;
   /** Send a discount offer to interested buyers. WRITE — only called after human approval. */
   sendOfferToInterestedBuyers(input: SendOfferInput): Promise<void>;
+  /** All active listings on the seller's account. Read-only — powers import. */
+  getActiveListings(): Promise<EbayActiveListing[]>;
+  /** Full details for one listing (import). Read-only. Null if eBay can't find it. */
+  getItemDetails(ebayListingId: string): Promise<EbayItemDetails | null>;
+  /** Change the price of a live listing. WRITE — driven by an explicit seller action. */
+  reviseListingPrice(input: { ebayListingId: string; priceUsd: number }): Promise<void>;
 }

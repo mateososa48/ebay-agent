@@ -8,6 +8,7 @@ export interface AutomationSettings {
   sales: boolean;
   messages: boolean;
   offers: boolean;
+  sync: boolean;
   discountPct: number;
 }
 
@@ -57,6 +58,17 @@ export function AutomationForm({ settings }: { settings: AutomationSettings }) {
           onChange={(on) => {
             setS({ ...s, messages: on });
             save('automation_messages', String(on));
+          }}
+        />
+      </Row>
+
+      <Row label="Keep eBay listings synced" hint="Auto-imports anything you list directly on eBay so the agent can manage it too">
+        {tick('automation_import')}
+        <Toggle
+          on={s.sync}
+          onChange={(on) => {
+            setS({ ...s, sync: on });
+            save('automation_import', String(on));
           }}
         />
       </Row>

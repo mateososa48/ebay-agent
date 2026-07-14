@@ -5,6 +5,7 @@ import { getSetting, getListingDefaults } from '@/lib/db/repos/settings';
 import { pollSales } from '@/lib/agent/steps/sales';
 import { pollMessages } from '@/lib/agent/steps/messages';
 import { pollOffers } from '@/lib/agent/steps/offers';
+import { importListings } from '@/lib/agent/steps/import';
 import { draftBuyerReply, fallbackReply } from '@/lib/ai/draft';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,16 @@ export async function GET(req: Request): Promise<NextResponse> {
   const db = getDb();
   const ebay = getEbayAdapter();
   const result: Record<string, unknown> = {};
+
+  // Import externally-created listings FIRST so sales/messages/offers can match
+  // them in this same run. Read-only against eBay; idempotent.
+  try {
+    if ((await getSetting(db, 'automation_import')) !== 'false') {
+      result.import = await importListings(db, ebay);
+    } else result.import = { skipped: 'disabled' };
+  } catch (e) {
+    result.importError = (e as Error).message;
+  }
 
   // Sale detection — read-only, on unless disabled.
   try {

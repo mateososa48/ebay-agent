@@ -1,6 +1,6 @@
 // lib/ebay/trading.ts
 import { ebayApiBase, getUserAccessToken } from './oauth';
-import type { EbaySale, EbayBuyerQuestion, BuyerReplyInput } from './types';
+import type { EbaySale, EbayBuyerQuestion, BuyerReplyInput, EbayActiveListing, EbayItemDetails } from './types';
 
 /** Minimal XML escaping for text nodes we embed in Trading requests. */
 function xmlEscape(s: string): string {
@@ -67,6 +67,100 @@ export async function getSellerPostalCode(): Promise<string | null> {
 <GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents"><DetailLevel>ReturnAll</DetailLevel></GetUserRequest>`,
   );
   return parseGetUserPostalCode(xml);
+}
+
+/** Pull the ActiveList items out of a GetMyeBaySelling XML response. */
+export function parseActiveListings(xml: string): EbayActiveListing[] {
+  const active = xml.match(/<ActiveList>[\s\S]*?<\/ActiveList>/)?.[0] ?? '';
+  const out: EbayActiveListing[] = [];
+  for (const item of active.match(/<Item>[\s\S]*?<\/Item>/g) ?? []) {
+    const ebayListingId = item.match(/<ItemID>(\d+)<\/ItemID>/)?.[1];
+    const title = item.match(/<Title>([\s\S]*?)<\/Title>/)?.[1]?.trim();
+    const priceRaw = item.match(/<CurrentPrice[^>]*>([\d.]+)<\/CurrentPrice>/)?.[1];
+    const price = Number(priceRaw);
+    if (!ebayListingId || !title) continue;
+    out.push({ ebayListingId, title, price: Number.isFinite(price) ? price : 0 });
+  }
+  return out;
+}
+
+/** All active listings on the connected seller's account (Trading GetMyeBaySelling). Read-only. */
+export async function getActiveListings(): Promise<EbayActiveListing[]> {
+  const xml = await tradingFetch(
+    'GetMyeBaySelling',
+    `<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ActiveList>
+    <Include>true</Include>
+    <Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>1</PageNumber></Pagination>
+  </ActiveList>
+</GetMyeBaySellingRequest>`,
+  );
+  return parseActiveListings(xml);
+}
+
+/** Pull full listing details out of a GetItem XML response. */
+export function parseItemDetails(xml: string): EbayItemDetails | null {
+  const ebayListingId = xml.match(/<ItemID>(\d+)<\/ItemID>/)?.[1];
+  const title = xml.match(/<Title>([\s\S]*?)<\/Title>/)?.[1]?.trim();
+  if (!ebayListingId || !title) return null;
+  const priceRaw = xml.match(/<CurrentPrice[^>]*>([\d.]+)<\/CurrentPrice>/)?.[1]
+    ?? xml.match(/<StartPrice[^>]*>([\d.]+)<\/StartPrice>/)?.[1];
+  const price = Number(priceRaw);
+  const description = xml.match(/<Description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/Description>/)?.[1]?.trim() ?? '';
+  const photoUrls = (xml.match(/<PictureURL>([^<]+)<\/PictureURL>/g) ?? [])
+    .map((m) => m.replace(/<\/?PictureURL>/g, '').trim())
+    .filter(Boolean);
+  const categoryId =
+    xml.match(/<PrimaryCategory>[\s\S]*?<CategoryID>(\d+)<\/CategoryID>[\s\S]*?<\/PrimaryCategory>/)?.[1] ?? null;
+  const conditionRaw = xml.match(/<ConditionID>(\d+)<\/ConditionID>/)?.[1];
+  const specifics: Record<string, string> = {};
+  for (const nv of xml.match(/<NameValueList>[\s\S]*?<\/NameValueList>/g) ?? []) {
+    const name = nv.match(/<Name>([\s\S]*?)<\/Name>/)?.[1]?.trim();
+    const value = nv.match(/<Value>([\s\S]*?)<\/Value>/)?.[1]?.trim();
+    if (name && value) specifics[name] = value;
+  }
+  return {
+    ebayListingId,
+    title,
+    description,
+    price: Number.isFinite(price) ? price : 0,
+    photoUrls,
+    categoryId,
+    conditionId: conditionRaw ? Number(conditionRaw) : null,
+    specifics,
+  };
+}
+
+/** Full details for one listing (Trading GetItem). Read-only. */
+export async function getItemDetails(ebayListingId: string): Promise<EbayItemDetails | null> {
+  const xml = await tradingFetch(
+    'GetItem',
+    `<?xml version="1.0" encoding="utf-8"?>
+<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>${xmlEscape(ebayListingId)}</ItemID>
+  <DetailLevel>ReturnAll</DetailLevel>
+  <IncludeItemSpecifics>true</IncludeItemSpecifics>
+</GetItemRequest>`,
+  );
+  return parseItemDetails(xml);
+}
+
+/** Change the price of a live fixed-price listing (Trading ReviseFixedPriceItem). WRITE. */
+export async function reviseListingPrice(input: { ebayListingId: string; priceUsd: number }): Promise<void> {
+  const res = await tradingRequest(
+    'ReviseFixedPriceItem',
+    `<?xml version="1.0" encoding="utf-8"?>
+<ReviseFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Item>
+    <ItemID>${xmlEscape(input.ebayListingId)}</ItemID>
+    <StartPrice>${input.priceUsd.toFixed(2)}</StartPrice>
+  </Item>
+</ReviseFixedPriceItemRequest>`,
+  );
+  if (res.ack !== 'Success' && res.ack !== 'Warning') {
+    throw new Error(res.errors.join('; ') || `eBay ReviseFixedPriceItem returned ${res.ack}`);
+  }
 }
 
 /** Pull sold items out of a GetSellerTransactions XML response. */

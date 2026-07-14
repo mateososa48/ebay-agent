@@ -17,6 +17,9 @@ function fakeAdapter(questions: EbayBuyerQuestion[]): EbayAdapter {
     replyToBuyerQuestion: async () => {},
     getEligibleOfferListingIds: async () => [],
     sendOfferToInterestedBuyers: async () => {},
+    getActiveListings: async () => [],
+    getItemDetails: async () => null,
+    reviseListingPrice: async () => {},
   };
 }
 

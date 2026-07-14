@@ -11,6 +11,7 @@ import { getAiSpend } from '@/lib/ai/spend';
 import { ModelSelector } from '@/components/settings/model-selector';
 import { ListingDefaultsForm } from '@/components/settings/listing-defaults';
 import { AutomationForm, type AutomationSettings } from '@/components/settings/automation';
+import { ImportListings } from '@/components/settings/import-listings';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export default async function SettingsPage() {
   // blip degrades to safe defaults instead of 500-ing the one page used to reconnect.
   let model = 'openai/gpt-5.4';
   let defaults = DEFAULT_LISTING_DEFAULTS;
-  let automation: AutomationSettings = { sales: true, messages: true, offers: true, discountPct: 10 };
+  let automation: AutomationSettings = { sales: true, messages: true, offers: true, sync: true, discountPct: 10 };
   try {
     const db = getDb();
     model = (await getSetting(db, 'model')) ?? model;
@@ -43,6 +44,7 @@ export default async function SettingsPage() {
       sales: (await getSetting(db, 'automation_sales')) !== 'false',
       messages: (await getSetting(db, 'automation_messages')) !== 'false',
       offers: (await getSetting(db, 'automation_offers')) !== 'false',
+      sync: (await getSetting(db, 'automation_import')) !== 'false',
       discountPct: Number.isFinite(pct) ? pct : 10,
     };
   } catch {
@@ -107,6 +109,12 @@ export default async function SettingsPage() {
                 Running on mock data until your production keyset is set as environment variables.
               </div>
             )}
+          </Card>
+        </Section>
+
+        <Section title="Existing listings" desc="What you listed on eBay before the agent — import it once and everything below applies to it too.">
+          <Card className="p-5">
+            <ImportListings />
           </Card>
         </Section>
 

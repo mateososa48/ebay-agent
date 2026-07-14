@@ -39,9 +39,14 @@ export async function rejectListingAction(listingId: string): Promise<{ ok: bool
   return { ok: true };
 }
 
-/** Direct edit from the review screen's controls (price/title/description/specifics). */
+/** Direct edit from the review screen's controls (price/title/description/specifics).
+ *  On live listings only the price is editable — it's revised on eBay first. */
 export async function updateListingAction(listingId: string, edit: ListingEdit): Promise<EditResult> {
-  const res = await applyListingEdit(getDb(), listingId, edit);
+  const res = await applyListingEdit(getDb(), listingId, edit, {
+    reviseLivePrice: isLiveBackend()
+      ? (ebayListingId, priceUsd) => getEbayAdapter().reviseListingPrice({ ebayListingId, priceUsd })
+      : undefined,
+  });
   if (res.ok) revalidatePath(`/listings/${listingId}`);
   return res;
 }

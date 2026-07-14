@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { getDb } from '@/lib/db/client';
 import { setSetting } from '@/lib/db/repos/settings';
+import { getEbayAdapter, isLiveBackend } from '@/lib/ebay';
+import { importListings } from '@/lib/agent/steps/import';
 import { MODEL_OPTIONS } from './model-options';
 
 const DEFAULT_KEYS = new Set([
@@ -15,6 +17,7 @@ const DEFAULT_KEYS = new Set([
   'automation_sales',
   'automation_messages',
   'automation_offers',
+  'automation_import',
   'offer_discount_pct',
 ]);
 
@@ -34,6 +37,7 @@ export async function setListingDefaultAction(key: string, value: string): Promi
     case 'automation_sales':
     case 'automation_messages':
     case 'automation_offers':
+    case 'automation_import':
       if (v !== 'true' && v !== 'false') return { ok: false };
       break;
     case 'offer_discount_pct': {
@@ -61,6 +65,23 @@ export async function setListingDefaultAction(key: string, value: string): Promi
   await setSetting(getDb(), key, v);
   revalidatePath('/settings');
   return { ok: true };
+}
+
+export type ImportActionResult =
+  | { ok: true; active: number; imported: number }
+  | { ok: false; error: string };
+
+/** Pull the seller's pre-existing live eBay listings into the app (Settings button). */
+export async function importEbayListingsAction(): Promise<ImportActionResult> {
+  if (!isLiveBackend()) return { ok: false, error: 'eBay backend isn’t live.' };
+  try {
+    const res = await importListings(getDb(), getEbayAdapter(), 50);
+    revalidatePath('/listings');
+    revalidatePath('/');
+    return { ok: true, ...res };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 export async function setModelAction(model: string): Promise<{ ok: boolean }> {

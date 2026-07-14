@@ -16,16 +16,55 @@ export type EditResult =
   | { ok: true; linter: LinterReport }
   | { ok: false; errors: string[] };
 
+export interface EditDeps {
+  /** Pushes a new price to eBay for a live listing (ReviseFixedPriceItem). When
+   *  absent, price edits on live listings are refused rather than silently
+   *  diverging from what buyers see. */
+  reviseLivePrice?: (ebayListingId: string, priceUsd: number) => Promise<void>;
+}
+
 /**
- * Apply an edit to a draft listing (title / price / description / specifics /
- * condition), re-lint the result, and refuse changes that would break policy.
+ * Apply an edit to a listing, re-lint the result, and refuse changes that would
+ * break policy. Draft listings accept any field. LIVE listings accept a
+ * price-only edit, which is revised on eBay first, then mirrored locally.
  * Shared by the review-screen edit controls and the assistant's update_listing tool.
  */
-export async function applyListingEdit(db: Db, listingId: string, edit: ListingEdit): Promise<EditResult> {
+export async function applyListingEdit(
+  db: Db,
+  listingId: string,
+  edit: ListingEdit,
+  deps: EditDeps = {},
+): Promise<EditResult> {
   const listing = await getListing(db, listingId);
   if (!listing) return { ok: false, errors: [`Listing ${listingId} not found.`] };
   if (listing.status === 'live') {
-    return { ok: false, errors: ['This listing is already live on eBay — edit it there.'] };
+    const extraFields = Object.entries(edit).filter(([k, v]) => k !== 'price' && v !== undefined);
+    if (extraFields.length > 0) {
+      return {
+        ok: false,
+        errors: ['Only the price can be changed on a live listing from here — edit other fields on eBay.'],
+      };
+    }
+    if (edit.price === undefined) return { ok: false, errors: ['Nothing to change.'] };
+    if (!Number.isFinite(edit.price) || edit.price <= 0) {
+      return { ok: false, errors: ['Price must be a positive number.'] };
+    }
+    if (!listing.ebayListingId || !deps.reviseLivePrice) {
+      return { ok: false, errors: ['Live price changes aren’t available right now — try again shortly.'] };
+    }
+    const newPrice = Math.round(edit.price * 100) / 100;
+    try {
+      await deps.reviseLivePrice(listing.ebayListingId, newPrice);
+    } catch (e) {
+      return { ok: false, errors: [`eBay rejected the price change: ${(e as Error).message}`] };
+    }
+    await updateListing(db, listingId, { price: newPrice });
+    await recordEvent(db, {
+      itemId: listing.itemId,
+      kind: 'price.revised',
+      data: { listingId, from: listing.price, to: newPrice, title: listing.title },
+    });
+    return { ok: true, linter: { ok: true, blocking: [], warnings: [] } };
   }
 
   // Merge aspects PER-KEY (never replace the whole map — that would silently drop
