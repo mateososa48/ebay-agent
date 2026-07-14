@@ -65,6 +65,11 @@ export async function listItems(db: Db): Promise<ItemRow[]> {
   return rows.map(mapItem);
 }
 
+/** Hard-delete an item; listings/comps cascade, events keep a null item_id. */
+export async function deleteItem(db: Db, id: string): Promise<void> {
+  await db.query(`delete from items where id = $1`, [id]);
+}
+
 export async function updateItemStatus(db: Db, id: string, status: string): Promise<void> {
   await db.query(`update items set status = $2, updated_at = now() where id = $1`, [id, status]);
 }

@@ -22,6 +22,7 @@ describe('applySchema', () => {
       'ebay_connection',
       'events',
       'items',
+      'listing_metrics',
       'listings',
       'offers',
     ]);

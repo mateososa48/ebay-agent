@@ -10,7 +10,7 @@ import { publishApprovedListing, type PublishOutcome } from '@/lib/agent/steps/p
 import { applyListingEdit, type ListingEdit, type EditResult } from '@/lib/agent/steps/editListing';
 import { getPendingApprovalByRef, decideApproval } from '@/lib/db/repos/approvals';
 import { getListing } from '@/lib/db/repos/listings';
-import { updateItemStatus } from '@/lib/db/repos/items';
+import { updateItemStatus, deleteItem } from '@/lib/db/repos/items';
 import { recordEvent } from '@/lib/db/repos/events';
 
 export async function publishListingAction(listingId: string): Promise<PublishOutcome> {
@@ -36,6 +36,27 @@ export async function rejectListingAction(listingId: string): Promise<{ ok: bool
   await updateItemStatus(db, listing.itemId, 'draft');
   await recordEvent(db, { itemId: listing.itemId, kind: 'sent_back', data: { listingId } });
   revalidatePath(`/listings/${listingId}`);
+  return { ok: true };
+}
+
+/** Permanently delete a DRAFT (never a live/sold listing — those exist on eBay).
+ *  Clears any pending approval first so the queue badge stays truthful. */
+export async function deleteDraftAction(listingId: string): Promise<{ ok: boolean; error?: string }> {
+  const db = getDb();
+  const listing = await getListing(db, listingId);
+  if (!listing) return { ok: false, error: 'Draft not found.' };
+  if (listing.status === 'live' || listing.status === 'sold') {
+    return { ok: false, error: 'This listing is on eBay — end it there first.' };
+  }
+  const approval = await getPendingApprovalByRef(db, listingId);
+  if (approval) await decideApproval(db, approval.id, 'rejected');
+  await recordEvent(db, {
+    kind: 'draft.deleted',
+    data: { listingId, title: listing.title },
+  });
+  await deleteItem(db, listing.itemId); // cascades the listing + comps
+  revalidatePath('/');
+  revalidatePath('/listings');
   return { ok: true };
 }
 

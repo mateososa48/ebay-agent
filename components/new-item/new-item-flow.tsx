@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEveAgent } from 'eve/react';
 import type { UserContent } from 'ai';
 import { upload } from '@vercel/blob/client';
@@ -10,6 +10,7 @@ import { Dropzone } from './dropzone';
 import { Pipeline, type PipeStep, type StepState } from './pipeline';
 import { Button, Card, Eyebrow } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
+import { loadRun, saveRun, patchRun } from './run-store';
 
 type AnyPart = { type?: string; toolName?: string; state?: string; output?: unknown; text?: string };
 type AnyMsg = { role?: string; parts?: AnyPart[] };
@@ -94,17 +95,47 @@ async function toUploadable(file: File): Promise<File> {
   return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
 }
 
-export function NewItemFlow() {
-  const agent = useEveAgent();
-  const [phase, setPhase] = useState<'upload' | 'working'>('upload');
+export function NewItemFlow({ resumeItemId }: { resumeItemId?: string }) {
+  // Resume a background run: restore its persisted stream events + session
+  // cursor so history re-renders and pending questions stay answerable.
+  // (Read once — useEveAgent only consumes options on first mount; the page
+  // keys this component by run so switching runs remounts it.)
+  const resumed = useMemo(() => (resumeItemId ? loadRun(resumeItemId) : null), [resumeItemId]);
+  const eventLog = useRef<unknown[]>(resumed?.events ? [...resumed.events] : []);
+  const itemIdRef = useRef<string | null>(resumed?.itemId ?? null);
+  const resolvedListingIdRef = useRef<string | null>(resumed?.listingId ?? null);
+
+  const agent = useEveAgent({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    initialEvents: (resumed?.events ?? []) as any,
+    initialSession: resumed?.sessionId
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ({ sessionId: resumed.sessionId, streamIndex: resumed.events.length } as any)
+      : undefined,
+    onEvent: (e: unknown) => {
+      eventLog.current.push(e);
+      const id = itemIdRef.current;
+      if (id) patchRun(id, { events: eventLog.current });
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onFinish: (s: any) => {
+      const id = itemIdRef.current;
+      if (!id) return;
+      patchRun(id, {
+        events: eventLog.current,
+        ...(s?.session?.sessionId ? { sessionId: s.session.sessionId as string } : {}),
+      });
+    },
+  });
+  const [phase, setPhase] = useState<'upload' | 'working'>(resumed ? 'working' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
+  const [previews, setPreviews] = useState<string[]>(resumed?.previews ?? []);
+  const [notes, setNotes] = useState(resumed?.notes ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState('');
-  const [itemId, setItemId] = useState<string | null>(null);
-  const [polledListingId, setPolledListingId] = useState<string | null>(null);
+  const [itemId, setItemId] = useState<string | null>(resumed?.itemId ?? null);
+  const [polledListingId, setPolledListingId] = useState<string | null>(resumed?.listingId ?? null);
   const [pollTimedOut, setPollTimedOut] = useState(false);
 
   const messages = (agent.data?.messages ?? []) as unknown as AnyMsg[];
@@ -118,14 +149,26 @@ export function NewItemFlow() {
     await agent.send({ inputResponses: [{ requestId: question.requestId, optionId, text }] });
   }
 
-  // Keep the seller's note across an accidental refresh/navigation.
+  // Keep the seller's note across an accidental refresh/navigation (fresh runs only —
+  // a resumed run already carries its own notes).
   useEffect(() => {
+    if (resumed) return;
     const saved = sessionStorage.getItem('new-item-notes');
     if (saved) setNotes(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    sessionStorage.setItem('new-item-notes', notes);
-  }, [notes]);
+    if (phase === 'upload') sessionStorage.setItem('new-item-notes', notes);
+  }, [notes, phase]);
+
+  // Mirror run state for the background-runs tray.
+  useEffect(() => {
+    const id = itemIdRef.current;
+    if (!id || phase !== 'working') return;
+    if (resolvedListingIdRef.current) return;
+    patchRun(id, { status: question ? 'needs_answer' : 'working' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, phase]);
 
   // Warn before leaving with staged photos or an in-flight run (the item isn't saved yet).
   const dirty =
@@ -208,6 +251,17 @@ export function NewItemFlow() {
   // it so the page always shows completion + the Review button.
   const resolvedListingId = listingId ?? polledListingId;
   useEffect(() => {
+    if (resolvedListingId && itemIdRef.current) {
+      resolvedListingIdRef.current = resolvedListingId;
+      patchRun(itemIdRef.current, { status: 'ready', listingId: resolvedListingId });
+    }
+  }, [resolvedListingId]);
+  useEffect(() => {
+    if (agent.status === 'error' && itemIdRef.current && !resolvedListingIdRef.current) {
+      patchRun(itemIdRef.current, { status: 'error' });
+    }
+  }, [agent.status]);
+  useEffect(() => {
     if (phase !== 'working' || !itemId || resolvedListingId) return;
     if (agent.status === 'error') return; // hard error — stop polling, show the retry state
     let active = true;
@@ -218,6 +272,8 @@ export function NewItemFlow() {
       if (!active) return;
       if (id) {
         setPolledListingId(id);
+        resolvedListingIdRef.current = id;
+        if (itemIdRef.current) patchRun(itemIdRef.current, { status: 'ready', listingId: id });
         clearInterval(iv);
         return;
       }
@@ -263,18 +319,29 @@ export function NewItemFlow() {
       const urls = uploaded.map((u) => u.url);
       const { itemId: newItemId } = await createItemAction({ photos: urls, notes });
       setItemId(newItemId);
+      itemIdRef.current = newItemId;
+      // Register the run so it survives navigation (background-runs tray + resume).
+      saveRun({
+        itemId: newItemId,
+        events: [],
+        notes: notes.trim() || undefined,
+        previews: urls,
+        status: 'working',
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+      });
       setPhase('working');
       const kickoff =
         `Prepare an eBay listing for the item with itemId "${newItemId}". Use that exact itemId in every tool call. ` +
-        `The seller's photos are attached — look at them closely. ` +
+        `ALL of the seller's photos are attached, in their current order — study every one (later photos often ` +
+        `hold labels, tags, and flaw close-ups), and curate them with update_photos. ` +
         (notes.trim() ? `The seller's notes: "${notes.trim()}". ` : `The seller left no notes. `) +
         `Follow your instructions step by step.`;
-      // Hand the model the actual photos (vision) + the notes, not just the itemId.
-      // Cap the images sent to the model — a dozen full-res photos bloats the
-      // vision context and is what stalled the heavier run; 8 is plenty to identify.
+      // Hand the model every photo (vision) + the notes. 24 is a generous ceiling
+      // that keeps the vision context sane on extreme uploads.
       const content: UserContent = [
         { type: 'text', text: kickoff },
-        ...uploaded.slice(0, 8).map((u) => ({ type: 'file' as const, data: u.url, mediaType: u.mediaType })),
+        ...uploaded.slice(0, 24).map((u) => ({ type: 'file' as const, data: u.url, mediaType: u.mediaType })),
       ];
       sessionStorage.removeItem('new-item-notes');
       await agent.send({ message: content });

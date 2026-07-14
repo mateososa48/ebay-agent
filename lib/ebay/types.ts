@@ -73,6 +73,14 @@ export interface EbayActiveListing {
   price: number; // current price, USD
 }
 
+/** Live engagement stats for one listing (Trading GetItem). */
+export interface EbayListingStats {
+  ebayListingId: string;
+  watchCount: number | null;
+  hitCount: number | null; // page views — eBay returns it to the seller when available
+  quantitySold: number | null;
+}
+
 /** Full details of one eBay listing (Trading GetItem) — used to import it. */
 export interface EbayItemDetails {
   ebayListingId: string;
@@ -112,4 +120,6 @@ export interface EbayAdapter {
   getItemDetails(ebayListingId: string): Promise<EbayItemDetails | null>;
   /** Change the price of a live listing. WRITE — driven by an explicit seller action. */
   reviseListingPrice(input: { ebayListingId: string; priceUsd: number }): Promise<void>;
+  /** Watch/view/sold counts for one live listing. Read-only — powers analytics. */
+  getListingStats(ebayListingId: string): Promise<EbayListingStats | null>;
 }

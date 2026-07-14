@@ -1,34 +1,47 @@
 import 'server-only';
+import { gateway } from 'ai';
 
 export interface AiSpend {
   available: boolean;
-  used?: number;
-  balance?: number;
+  used?: number; // cumulative spend, USD
+  balance?: number; // remaining credit, USD
 }
 
 /**
- * AI Gateway spend. The gateway exposes a credits endpoint when an
- * AI_GATEWAY_API_KEY is set (on Vercel the runtime usually authenticates via OIDC
- * instead, in which case there's no key to query — we degrade to the dashboard
- * link in the UI). Never throws.
+ * AI Gateway spend. The gateway provider authenticates exactly like inference —
+ * AI_GATEWAY_API_KEY if set, otherwise the Vercel OIDC token — so on Vercel this
+ * works with ZERO configuration. Never throws.
  */
 export async function getAiSpend(): Promise<AiSpend> {
-  const key = process.env.AI_GATEWAY_API_KEY;
-  if (!key) return { available: false };
   try {
-    const res = await fetch('https://ai-gateway.vercel.sh/v1/credits', {
-      headers: { Authorization: `Bearer ${key}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) return { available: false };
-    const data = (await res.json()) as Record<string, unknown>;
-    const num = (v: unknown) => (v == null || v === '' ? undefined : Number(v));
-    return {
-      available: true,
-      balance: num(data.balance ?? data.credits),
-      used: num(data.total_used ?? data.used ?? data.usage),
+    const credits = await gateway.getCredits(); // GET ai-gateway.vercel.sh/v1/credits
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
     };
+    return { available: true, used: num(credits.totalUsed), balance: num(credits.balance) };
   } catch {
-    return { available: false };
+    return { available: false }; // no OIDC (e.g. local dev without vercel env) and no key
+  }
+}
+
+export interface GatewayModel {
+  id: string;
+  name: string;
+}
+
+/**
+ * Live model catalog from the AI Gateway (same zero-config auth). Falls back to
+ * null on failure — callers then use the curated list.
+ */
+export async function getGatewayModels(): Promise<GatewayModel[] | null> {
+  try {
+    const res = await gateway.getAvailableModels();
+    const models = res.models
+      .filter((m) => (m as { modelType?: string }).modelType !== 'embedding')
+      .map((m) => ({ id: m.id, name: m.name ?? m.id }));
+    return models.length > 0 ? models : null;
+  } catch {
+    return null;
   }
 }

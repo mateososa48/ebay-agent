@@ -10,18 +10,24 @@ export interface ImportResult {
   imported: number; // newly imported into the app this run
 }
 
-/** eBay descriptions arrive as HTML — flatten to readable text so the agent can
- *  ground replies/edits in it. Cheap tag strip + entity decode, capped. */
+/** eBay descriptions arrive as HTML — and sometimes HTML-escaped HTML (listings
+ *  pasted from other tools). Decode entities FIRST so escaped tags become real
+ *  tags, then strip all tags, then tidy whitespace. Runs the decode+strip twice
+ *  to handle double-escaped content. Capped. */
 export function stripHtml(html: string, cap = 4000): string {
-  const text = html
-    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\s*\/?\s*>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
+  const decode = (s: string) =>
+    s
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&amp;/gi, '&');
+  const strip = (s: string) =>
+    s.replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\s*\/?\s*>/gi, '\n').replace(/<[^>]+>/g, ' ');
+  let text = html;
+  for (let pass = 0; pass < 2; pass++) text = strip(decode(text));
+  text = text
     .replace(/[ \t]+/g, ' ')
     .replace(/\s*\n\s*/g, '\n')
     .trim();

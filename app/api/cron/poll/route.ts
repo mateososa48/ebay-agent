@@ -6,6 +6,7 @@ import { pollSales } from '@/lib/agent/steps/sales';
 import { pollMessages } from '@/lib/agent/steps/messages';
 import { pollOffers } from '@/lib/agent/steps/offers';
 import { importListings } from '@/lib/agent/steps/import';
+import { pollMetrics } from '@/lib/agent/steps/metrics';
 import { draftBuyerReply, fallbackReply } from '@/lib/ai/draft';
 
 export const dynamic = 'force-dynamic';
@@ -95,6 +96,13 @@ export async function GET(req: Request): Promise<NextResponse> {
     } else result.offers = { skipped: 'disabled' };
   } catch (e) {
     result.offersError = (e as Error).message;
+  }
+
+  // Engagement snapshots (views/watchers/sold) — read-only, powers the dashboard charts.
+  try {
+    result.metrics = await pollMetrics(db, ebay);
+  } catch (e) {
+    result.metricsError = (e as Error).message;
   }
 
   // Touch listing defaults so a mis-set ZIP etc. surfaces in logs early (cheap, cached row).

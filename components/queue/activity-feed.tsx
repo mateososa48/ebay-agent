@@ -2,8 +2,8 @@ import { Eyebrow } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
 import type { ActivityEntry } from '@/lib/queries';
 
-function describe(e: ActivityEntry): { text: string; tone: string } {
-  const d = e.data as { title?: string; salePrice?: number; offerPrice?: number; buyer?: string };
+export function describe(e: ActivityEntry): { text: string; tone: string } {
+  const d = e.data as { title?: string; salePrice?: number; offerPrice?: number; buyer?: string; from?: number; to?: number };
   const title = d.title ? `“${d.title.slice(0, 48)}${(d.title.length ?? 0) > 48 ? '…' : ''}”` : 'a listing';
   switch (e.kind) {
     case 'sale.detected':
@@ -16,8 +16,19 @@ function describe(e: ActivityEntry): { text: string; tone: string } {
       return { text: `Drafted a $${d.offerPrice} offer to watchers of ${title}`, tone: 'var(--ebay-blue)' };
     case 'offer.sent':
       return { text: `Sent a $${d.offerPrice} offer to watchers of ${title}`, tone: 'var(--ebay-green-deep)' };
+    case 'listing.imported':
+      return { text: `Imported ${title} from your eBay account`, tone: 'var(--ebay-blue)' };
+    case 'price.revised':
+      return {
+        text: `Changed the price of ${title}${d.from != null && d.to != null ? ` $${d.from} → $${d.to}` : ''}`,
+        tone: 'var(--ebay-yellow)',
+      };
+    case 'published':
+      return { text: `Published ${title} to eBay`, tone: 'var(--ebay-green-deep)' };
+    case 'draft.deleted':
+      return { text: `Deleted the draft ${title}`, tone: 'var(--ink-muted)' };
     default:
-      return { text: e.kind, tone: 'var(--ink-muted)' };
+      return { text: e.kind.replace(/[._]/g, ' '), tone: 'var(--ink-muted)' };
   }
 }
 

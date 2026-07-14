@@ -241,7 +241,17 @@ export interface ActivityEntry {
   createdAt: string;
 }
 
-const ACTIVITY_KINDS = ['sale.detected', 'message.drafted', 'message.sent', 'offer.drafted', 'offer.sent'];
+const ACTIVITY_KINDS = [
+  'sale.detected',
+  'message.drafted',
+  'message.sent',
+  'offer.drafted',
+  'offer.sent',
+  'listing.imported',
+  'price.revised',
+  'draft.deleted',
+  'published',
+];
 
 /** Recent buyer-automation activity for the dashboard feed. Never throws. */
 export async function getRecentActivity(limit = 10): Promise<ActivityEntry[]> {
@@ -330,4 +340,286 @@ export async function getListingDetail(listingId: string): Promise<ListingDetail
       })),
     },
   };
+}
+
+/* ------------------- Listing analytics (detail page) ------------------- */
+
+export interface ListingAnalytics {
+  series: { watchCount: number | null; hitCount: number | null; quantitySold: number | null; capturedAt: string }[];
+  latest: { watchCount: number | null; hitCount: number | null; quantitySold: number | null; capturedAt: string } | null;
+  messages: {
+    id: string;
+    sender: string | null;
+    question: string;
+    draftedReply: string | null;
+    status: string;
+    createdAt: string;
+  }[];
+  offers: { id: string; offerPrice: number; discountPct: number; status: string; createdAt: string }[];
+  timeline: { id: string; kind: string; data: Record<string, unknown>; createdAt: string }[];
+  soldAt: string | null;
+  salePrice: number | null;
+  listedAt: string | null; // when it went live (import or publish), best-effort
+}
+
+/** Everything we know about one listing beyond the draft fields. Never throws. */
+export async function getListingAnalytics(listingId: string): Promise<ListingAnalytics> {
+  const empty: ListingAnalytics = {
+    series: [],
+    latest: null,
+    messages: [],
+    offers: [],
+    timeline: [],
+    soldAt: null,
+    salePrice: null,
+    listedAt: null,
+  };
+  try {
+    const db = getDb();
+    const [metrics, msgs, offs, listingRow] = await Promise.all([
+      db.query<Row>(
+        `select watch_count, hit_count, quantity_sold, captured_at
+         from listing_metrics where listing_id = $1 order by captured_at asc limit 300`,
+        [listingId],
+      ),
+      db.query<Row>(
+        `select id, sender, question, drafted_reply, status, created_at
+         from buyer_messages where listing_id = $1 order by created_at desc limit 20`,
+        [listingId],
+      ),
+      db.query<Row>(
+        `select id, offer_price, discount_pct, status, created_at
+         from offers where listing_id = $1 order by created_at desc limit 10`,
+        [listingId],
+      ),
+      db.query<Row>(`select item_id, sold_at, sale_price, updated_at, status from listings where id = $1`, [listingId]),
+    ]);
+    const listing = listingRow.rows[0];
+    let timeline: ListingAnalytics['timeline'] = [];
+    let listedAt: string | null = null;
+    if (listing) {
+      const ev = await db.query<Row>(
+        `select id, kind, data, created_at from events where item_id = $1 order by created_at desc limit 30`,
+        [String(listing.item_id)],
+      );
+      timeline = ev.rows.map((r) => ({
+        id: String(r.id),
+        kind: String(r.kind),
+        data: (r.data as Record<string, unknown>) ?? {},
+        createdAt: new Date(String(r.created_at)).toISOString(),
+      }));
+      const listedEvent = ev.rows.find((r) => r.kind === 'published' || r.kind === 'listing.imported');
+      listedAt = listedEvent ? new Date(String(listedEvent.created_at)).toISOString() : null;
+    }
+    const series = metrics.rows.map((r) => ({
+      watchCount: r.watch_count == null ? null : Number(r.watch_count),
+      hitCount: r.hit_count == null ? null : Number(r.hit_count),
+      quantitySold: r.quantity_sold == null ? null : Number(r.quantity_sold),
+      capturedAt: new Date(String(r.captured_at)).toISOString(),
+    }));
+    return {
+      series,
+      latest: series[series.length - 1] ?? null,
+      messages: msgs.rows.map((r) => ({
+        id: String(r.id),
+        sender: r.sender == null ? null : String(r.sender),
+        question: String(r.question),
+        draftedReply: r.drafted_reply == null ? null : String(r.drafted_reply),
+        status: String(r.status),
+        createdAt: new Date(String(r.created_at)).toISOString(),
+      })),
+      offers: offs.rows.map((r) => ({
+        id: String(r.id),
+        offerPrice: Number(r.offer_price),
+        discountPct: Number(r.discount_pct),
+        status: String(r.status),
+        createdAt: new Date(String(r.created_at)).toISOString(),
+      })),
+      timeline,
+      soldAt: listing?.sold_at ? new Date(String(listing.sold_at)).toISOString() : null,
+      salePrice: listing?.sale_price == null ? null : Number(listing.sale_price),
+      listedAt,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/* ------------------------- Overview / dashboard ------------------------- */
+
+export interface DashboardData {
+  stats: {
+    live: number;
+    sold: number;
+    revenue: number; // sum of sale prices
+    queuedValue: number; // drafts awaiting approval
+    pendingApprovals: number; // all types
+    totalWatchers: number;
+    totalViews: number;
+  };
+  liveListings: {
+    id: string;
+    title: string;
+    photo: string;
+    price: number | null;
+    watchers: number | null;
+    views: number | null;
+    daysLive: number;
+    openMessages: number;
+    offerStatus: string | null; // drafted | sent | null
+    watchSeries: (number | null)[]; // sparkline
+  }[];
+  salesByWeek: { week: string; revenue: number; count: number }[];
+  attention: { kind: 'draft' | 'reply' | 'offer'; id: string; title: string; detail: string; href: string }[];
+  activity: ActivityEntry[];
+}
+
+/** Aggregates for the Overview page. Each block degrades independently. */
+export async function getDashboardData(nowMs: number): Promise<DashboardData> {
+  serverNow = () => nowMs;
+  const db = getDb();
+  const data: DashboardData = {
+    stats: { live: 0, sold: 0, revenue: 0, queuedValue: 0, pendingApprovals: 0, totalWatchers: 0, totalViews: 0 },
+    liveListings: [],
+    salesByWeek: [],
+    attention: [],
+    activity: [],
+  };
+
+  try {
+    const { rows } = await db.query<Row>(
+      `select
+         count(*) filter (where status = 'live') as live,
+         count(*) filter (where status = 'sold') as sold,
+         coalesce(sum(sale_price) filter (where status = 'sold'), 0) as revenue
+       from listings`,
+    );
+    const r = rows[0];
+    data.stats.live = Number(r?.live ?? 0);
+    data.stats.sold = Number(r?.sold ?? 0);
+    data.stats.revenue = Number(r?.revenue ?? 0);
+  } catch { /* keep zeros */ }
+
+  try {
+    const { rows } = await db.query<Row>(
+      `select coalesce(sum(l.price), 0) as queued, count(*) as n
+       from approvals a join listings l on l.id = a.ref_id
+       where a.type = 'listing' and a.state = 'pending'`,
+    );
+    data.stats.queuedValue = Number(rows[0]?.queued ?? 0);
+  } catch { /* ignore */ }
+
+  try {
+    const { rows } = await db.query<Row>(`select count(*) as n from approvals where state = 'pending'`);
+    data.stats.pendingApprovals = Number(rows[0]?.n ?? 0);
+  } catch { /* ignore */ }
+
+  try {
+    const { rows } = await db.query<Row>(
+      `with latest as (
+         select distinct on (listing_id) listing_id, watch_count, hit_count
+         from listing_metrics order by listing_id, captured_at desc
+       ),
+       spark as (
+         select listing_id, array_agg(watch_count order by captured_at desc) as watches
+         from (select listing_id, watch_count, captured_at,
+                      row_number() over (partition by listing_id order by captured_at desc) as rn
+               from listing_metrics) t
+         where rn <= 24
+         group by listing_id
+       )
+       select l.id, l.title, l.price, l.created_at, i.photos,
+              m.watch_count, m.hit_count, s.watches,
+              (select count(*) from buyer_messages bm where bm.listing_id = l.id and bm.status = 'drafted') as open_msgs,
+              (select o.status from offers o where o.listing_id = l.id and o.status in ('drafted','sent')
+               order by o.created_at desc limit 1) as offer_status
+       from listings l
+       join items i on i.id = l.item_id
+       left join latest m on m.listing_id = l.id
+       left join spark s on s.listing_id = l.id
+       where l.status = 'live'
+       order by coalesce(m.watch_count, 0) desc, l.created_at desc`,
+    );
+    data.liveListings = rows.map((r) => {
+      const photos = (r.photos as string[] | null) ?? [];
+      const watches = ((r.watches as (number | string | null)[] | null) ?? [])
+        .map((w) => (w == null ? null : Number(w)))
+        .reverse(); // oldest → newest for the sparkline
+      return {
+        id: String(r.id),
+        title: String(r.title),
+        photo: photos[0] ?? '',
+        price: r.price == null ? null : Number(r.price),
+        watchers: r.watch_count == null ? null : Number(r.watch_count),
+        views: r.hit_count == null ? null : Number(r.hit_count),
+        daysLive: Math.max(0, Math.round(minutesSince(r.created_at) / 1440)),
+        openMessages: Number(r.open_msgs ?? 0),
+        offerStatus: r.offer_status == null ? null : String(r.offer_status),
+        watchSeries: watches,
+      };
+    });
+    data.stats.totalWatchers = data.liveListings.reduce((s, l) => s + (l.watchers ?? 0), 0);
+    data.stats.totalViews = data.liveListings.reduce((s, l) => s + (l.views ?? 0), 0);
+  } catch { /* ignore */ }
+
+  try {
+    const { rows } = await db.query<Row>(
+      `select date_trunc('week', sold_at) as week, sum(sale_price) as revenue, count(*) as n
+       from listings where status = 'sold' and sold_at is not null
+       group by 1 order by 1 asc limit 26`,
+    );
+    data.salesByWeek = rows.map((r) => ({
+      week: new Date(String(r.week)).toISOString(),
+      revenue: Number(r.revenue ?? 0),
+      count: Number(r.n ?? 0),
+    }));
+  } catch { /* ignore */ }
+
+  try {
+    const [drafts, replies, offers] = await Promise.all([
+      db.query<Row>(
+        `select l.id, l.title, l.price from approvals a join listings l on l.id = a.ref_id
+         where a.type = 'listing' and a.state = 'pending' order by a.created_at desc limit 8`,
+      ),
+      db.query<Row>(
+        `select bm.id, bm.question, l.title, bm.listing_id from buyer_messages bm
+         left join listings l on l.id = bm.listing_id
+         where bm.status = 'drafted' order by bm.created_at desc limit 8`,
+      ),
+      db.query<Row>(
+        `select o.id, o.offer_price, l.title, o.listing_id from offers o
+         join listings l on l.id = o.listing_id
+         where o.status = 'drafted' order by o.created_at desc limit 8`,
+      ),
+    ]);
+    data.attention = [
+      ...drafts.rows.map((r) => ({
+        kind: 'draft' as const,
+        id: String(r.id),
+        title: String(r.title),
+        detail: r.price == null ? 'Draft ready to review' : `Draft · $${Number(r.price)}`,
+        href: `/listings/${String(r.id)}`,
+      })),
+      ...replies.rows.map((r) => ({
+        kind: 'reply' as const,
+        id: String(r.id),
+        title: r.title == null ? 'Buyer question' : String(r.title),
+        detail: `Reply drafted — "${String(r.question).slice(0, 60)}${String(r.question).length > 60 ? '…' : ''}"`,
+        href: '/',
+      })),
+      ...offers.rows.map((r) => ({
+        kind: 'offer' as const,
+        id: String(r.id),
+        title: String(r.title),
+        detail: `Offer drafted · $${Number(r.offer_price).toFixed(2)}`,
+        href: '/',
+      })),
+    ];
+  } catch { /* ignore */ }
+
+  try {
+    data.activity = await getRecentActivity(14);
+  } catch { /* ignore */ }
+
+  return data;
 }

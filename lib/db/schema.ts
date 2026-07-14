@@ -108,6 +108,15 @@ export const SCHEMA_STATEMENTS: string[] = [
    )`,
   `create index if not exists idx_buyer_messages_status on buyer_messages(status)`,
   `create index if not exists idx_offers_listing on offers(listing_id)`,
+  `create table if not exists listing_metrics (
+     id uuid primary key default gen_random_uuid(),
+     listing_id uuid not null references listings(id) on delete cascade,
+     watch_count integer,
+     hit_count integer,
+     quantity_sold integer,
+     captured_at timestamptz not null default now()
+   )`,
+  `create index if not exists idx_listing_metrics_listing on listing_metrics(listing_id, captured_at)`,
 ];
 
 export async function applySchema(db: Db): Promise<void> {

@@ -10,6 +10,7 @@ import type {
   SendOfferInput,
   EbayActiveListing,
   EbayItemDetails,
+  EbayListingStats,
 } from './types';
 import type { ItemIdentity, Comp } from '../types';
 import { MockEbayAdapter } from './mock';
@@ -23,6 +24,7 @@ import {
   getActiveListings,
   getItemDetails,
   reviseListingPrice,
+  getListingStats,
 } from './trading';
 import { getEligibleOfferListingIds, sendOfferToInterestedBuyers } from './negotiation';
 
@@ -106,6 +108,10 @@ export class LiveEbayAdapter implements EbayAdapter {
 
   reviseListingPrice(input: { ebayListingId: string; priceUsd: number }): Promise<void> {
     return reviseListingPrice(input);
+  }
+
+  getListingStats(ebayListingId: string): Promise<EbayListingStats | null> {
+    return getListingStats(ebayListingId);
   }
 
   private async browseComps(identity: ItemIdentity): Promise<Comp[]> {

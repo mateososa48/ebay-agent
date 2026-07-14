@@ -9,26 +9,51 @@ import type { ListingDetail } from '@/lib/sample-listing';
 type AnyPart = { type?: string; text?: string; state?: string; toolName?: string };
 type AnyMsg = { role?: string; parts?: AnyPart[] };
 
+type ToolKind = 'update_listing' | 'update_photos' | 'research';
+
 type Row =
-  | { id: string; kind: 'user' | 'assistant'; text: string }
-  | { id: string; kind: 'tool'; text: string };
+  | { id: string; kind: 'user'; text: string }
+  | { id: string; kind: 'assistant'; texts: string[] }
+  | { id: string; kind: 'tool'; tool: ToolKind };
 
-const SUGGESTIONS = [
-  'Why is it priced here?',
-  'Make the title punchier',
-  'Shorten the description',
-  'Is the condition right?',
-];
-
-function isUpdatePart(p: AnyPart): boolean {
-  return p?.type === 'tool-update_listing' || (p?.type === 'dynamic-tool' && p?.toolName === 'update_listing');
+/** Map a message part to the tool chip it should render, if any. */
+function toolKindOf(p: AnyPart): ToolKind | null {
+  const name =
+    p?.type === 'dynamic-tool'
+      ? p.toolName
+      : typeof p?.type === 'string' && p.type.startsWith('tool-')
+        ? p.type.slice(5)
+        : undefined;
+  switch (name) {
+    case 'update_listing':
+      return 'update_listing';
+    case 'update_photos':
+      return 'update_photos';
+    case 'research_price':
+    case 'web_search':
+      return 'research';
+    default:
+      return null;
+  }
 }
 
-/** Build an ordered chat timeline: user + assistant text, with inline chips when the agent edits the listing. */
+/**
+ * Build an ordered chat timeline. Consecutive assistant paragraphs are grouped
+ * into a single editorial block; completed tool calls become inline chips that
+ * break the group.
+ */
 function buildRows(messages: AnyMsg[]): Row[] {
   const out: Row[] = [];
+  let texts: string[] = [];
+  let groupId = '';
+  const flush = () => {
+    if (texts.length) out.push({ id: groupId, kind: 'assistant', texts });
+    texts = [];
+  };
+
   messages.forEach((m, mi) => {
     if (m.role === 'user') {
+      flush();
       const text = (m.parts ?? [])
         .filter((p) => p?.type === 'text' && typeof p.text === 'string')
         .map((p) => p.text)
@@ -40,23 +65,51 @@ function buildRows(messages: AnyMsg[]): Row[] {
     if (m.role !== 'assistant') return;
     (m.parts ?? []).forEach((p, pi) => {
       if (p?.type === 'text' && typeof p.text === 'string' && p.text.trim()) {
-        out.push({ id: `a${mi}-${pi}`, kind: 'assistant', text: p.text.trim() });
-      } else if (isUpdatePart(p) && p.state === 'output-available') {
-        out.push({ id: `t${mi}-${pi}`, kind: 'tool', text: 'Updated the listing' });
+        if (!texts.length) groupId = `a${mi}-${pi}`;
+        texts.push(p.text.trim());
+        return;
+      }
+      const tool = toolKindOf(p);
+      if (tool && p?.state === 'output-available') {
+        flush();
+        out.push({ id: `t${mi}-${pi}`, kind: 'tool', tool });
       }
     });
   });
+  flush();
   return out;
 }
 
-function AgentAvatar() {
+const CHIP_META: Record<ToolKind, { label: string; Glyph: (typeof Icon)[keyof typeof Icon]; color: string; tint: string }> = {
+  update_listing: { label: 'Updated the listing', Glyph: Icon.Check, color: 'var(--ebay-green-deep)', tint: 'var(--tint-green)' },
+  update_photos: { label: 'Updated the photos', Glyph: Icon.Photo, color: 'var(--ebay-green-deep)', tint: 'var(--tint-green)' },
+  research: { label: 'Researched prices', Glyph: Icon.Trend, color: 'var(--ebay-blue-deep)', tint: 'var(--tint-blue)' },
+};
+
+function ToolChip({ tool }: { tool: ToolKind }) {
+  const { label, Glyph, color, tint } = CHIP_META[tool];
   return (
     <span
-      className="grid size-7 shrink-0 place-items-center rounded-full shadow-raised"
-      style={{ background: 'linear-gradient(140deg, var(--tint-blue), color-mix(in oklab, var(--ebay-blue) 22%, var(--surface)))' }}
+      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.09em]"
+      style={{ color, background: tint, borderColor: `color-mix(in oklab, ${color} 24%, transparent)` }}
     >
-      <Icon.Sparkle className="size-[15px]" style={{ color: 'var(--ebay-blue)' }} />
+      <Glyph className="size-3" strokeWidth={2.1} />
+      {label}
     </span>
+  );
+}
+
+/** Hairline left accent used by every assistant block — editorial, not bubble. */
+function AccentRail({ pulsing = false }: { pulsing?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`absolute bottom-0.5 left-0 top-0.5 w-[2px] rounded-full${pulsing ? ' animate-pulse' : ''}`}
+      style={{
+        background:
+          'linear-gradient(to bottom, color-mix(in oklab, var(--ebay-blue) 55%, transparent), color-mix(in oklab, var(--ebay-blue) 10%, transparent))',
+      }}
+    />
   );
 }
 
@@ -72,7 +125,8 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
   const rows = useMemo(() => buildRows(messages), [messages]);
 
   // Refresh the page when the agent finishes an edit so the panels reflect it.
-  const updates = useMemo(() => rows.filter((r) => r.kind === 'tool').length, [rows]);
+  // Research chips are informational only — they never trigger a refresh.
+  const updates = useMemo(() => rows.filter((r) => r.kind === 'tool' && r.tool !== 'research').length, [rows]);
   const seenUpdates = useRef(0);
   useEffect(() => {
     if (updates > seenUpdates.current) {
@@ -81,10 +135,10 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
     }
   }, [updates, router]);
 
-  // Keep pinned to the latest message.
+  // Keep pinned to the latest message, including mid-stream growth.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [rows.length, running]);
+  }, [rows, running]);
 
   // Auto-grow the input from a single line up to a cap.
   useEffect(() => {
@@ -94,17 +148,34 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
   }, [input]);
 
+  const isLive = listing.status === 'live' || listing.status === 'sold';
+  const suggestions = useMemo(() => {
+    // On eBay, only the price of a live listing can change — suggest questions
+    // and price moves there, and full edits (photos, title, copy) on drafts.
+    if (isLive) {
+      return ['Why this price?', 'Should I drop the price?', 'How would you sell this faster?', 'What do the comps say now?'];
+    }
+    const s: string[] = [];
+    if (listing.photos.length > 1) s.push('Pick a better cover photo');
+    s.push('Why this price?', 'Tighten the title', 'Any risky claims in the description?');
+    if (s.length < 4) s.push('Anything missing from the specifics?');
+    return s.slice(0, 4);
+  }, [listing.photos.length, isLive]);
+
   async function sendText(raw: string) {
     const text = raw.trim();
     if (!text || running) return;
     setInput('');
     const context = JSON.stringify({
       listingId: listing.id,
+      sku: listing.sku,
+      ebayListingId: listing.ebayListingId,
       title: listing.title,
       price: listing.price,
       condition: listing.condition,
       description: listing.description,
       itemSpecifics: listing.specifics,
+      photos: listing.photos,
       compRange: { low: listing.compLow, high: listing.compHigh, count: listing.comps.length },
     });
     await agent.send({ message: text, clientContext: context });
@@ -113,44 +184,108 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
   if (disabled) return null;
 
   const empty = rows.length === 0 && !running;
+  const lastRow = rows[rows.length - 1];
+  const showTyping = running && (!lastRow || lastRow.kind !== 'assistant');
+  const statusLabel = running ? (agent.status === 'streaming' ? 'Writing…' : 'Thinking…') : 'Ready';
 
   return (
-    <div className="reveal flex max-h-[520px] flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-raised" style={{ animationDelay: '180ms' }}>
-      {/* Header */}
-      <div className="flex items-center gap-2.5 border-b border-hairline bg-surface-2/40 px-4 py-3">
-        <AgentAvatar />
-        <div className="min-w-0 leading-tight">
-          <div className="font-display text-[14px] font-bold text-ink">Ask the agent</div>
-          <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
-            <span
-              className="size-1.5 rounded-full"
-              style={{ background: running ? 'var(--ebay-blue)' : 'var(--ebay-green)' }}
-            />
-            {running ? 'Working…' : 'Ready to help with this listing'}
+    <div
+      className="reveal flex max-h-[560px] flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-raised"
+      style={{ animationDelay: '180ms' }}
+    >
+      {/* Header — identity + live status, glass gradient edge, shimmer while running */}
+      <div className="relative shrink-0 border-b border-hairline">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-4 top-0 h-px"
+          style={{
+            background:
+              'linear-gradient(to right, transparent, color-mix(in oklab, var(--ebay-blue) 32%, transparent), transparent)',
+          }}
+        />
+        <div
+          className="flex items-center gap-2.5 px-4 py-3"
+          style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--tint-blue) 55%, transparent), transparent 92%)' }}
+        >
+          <span
+            className="grid size-8 shrink-0 place-items-center rounded-full border border-hairline shadow-raised"
+            style={{
+              background:
+                'radial-gradient(130% 130% at 28% 22%, color-mix(in oklab, var(--ebay-blue) 28%, var(--surface)), var(--tint-blue) 52%, var(--surface))',
+            }}
+          >
+            <Icon.Sparkle className="size-4" style={{ color: 'var(--ebay-blue)' }} />
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="font-display text-[13.5px] font-bold tracking-[-0.01em] text-ink">Listing agent</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-muted">
+              <span className="relative flex size-1.5 shrink-0">
+                {running && (
+                  <span
+                    className="absolute inset-0 animate-ping rounded-full"
+                    style={{ background: 'var(--ebay-blue)', opacity: 0.4 }}
+                  />
+                )}
+                <span
+                  className="relative size-1.5 rounded-full"
+                  style={{ background: running ? 'var(--ebay-blue)' : 'var(--ebay-green)' }}
+                />
+              </span>
+              <span className="truncate">{statusLabel}</span>
+            </div>
           </div>
+          <span className="hidden rounded-md border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] tracking-[0.05em] text-ink-faint sm:inline-block">
+            {listing.sku}
+          </span>
         </div>
+        {running && (
+          <div aria-hidden className="absolute inset-x-0 -bottom-px flex h-[2px]">
+            {Array.from({ length: 14 }).map((_, i) => (
+              <span
+                key={i}
+                className="h-full flex-1 animate-pulse"
+                style={{
+                  background: 'color-mix(in oklab, var(--ebay-blue) 55%, transparent)',
+                  animationDelay: `${i * 110}ms`,
+                  animationDuration: '1.4s',
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" style={{ scrollbarWidth: 'thin' }}>
+      <div
+        ref={scrollRef}
+        role="log"
+        aria-live="polite"
+        className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4"
+        style={{ scrollbarWidth: 'thin' }}
+      >
         {empty ? (
           <div className="pt-1">
-            <div className="flex gap-2.5">
-              <AgentAvatar />
-              <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-surface-2/70 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink/90">
-                Ask me why it&rsquo;s priced this way, or tell me to change the title, price, description, or specifics — I&rsquo;ll do it and update the page.
-              </div>
+            <div className="relative max-w-[94%] pl-3.5">
+              <AccentRail />
+              <p className="text-[13.5px] leading-relaxed text-ink/90">
+                Ask about the price, or tell me what to change — title, price, photos, description, specifics. Edits land
+                on this page right away.
+              </p>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2 pl-[38px]">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => void sendText(s)}
-                  className="rounded-full border border-hairline bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-muted transition-all hover:-translate-y-px hover:border-hairline-strong hover:text-ink"
-                >
-                  {s}
-                </button>
-              ))}
+            <div className="mt-4 pl-3.5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">Try</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => void sendText(s)}
+                    className="rounded-full border border-hairline bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-muted shadow-raised transition-[transform,color,background-color,border-color] duration-150 hover:-translate-y-px hover:bg-tint-blue hover:text-ink active:translate-y-0 active:scale-[0.98]"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
@@ -158,7 +293,10 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
             if (r.kind === 'user') {
               return (
                 <div key={r.id} className="flex justify-end">
-                  <div className="max-w-[82%] rounded-2xl rounded-tr-md px-3.5 py-2.5 text-[13.5px] leading-relaxed text-white" style={{ background: 'var(--ebay-blue)' }}>
+                  <div
+                    className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-[6px] px-3.5 py-2 text-[13px] leading-relaxed text-white shadow-raised"
+                    style={{ background: 'var(--ebay-blue)' }}
+                  >
                     {r.text}
                   </div>
                 </div>
@@ -166,34 +304,35 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
             }
             if (r.kind === 'tool') {
               return (
-                <div key={r.id} className="flex items-center gap-2 pl-[38px] text-[12px] font-medium" style={{ color: 'var(--ebay-green-deep)' }}>
-                  <span className="grid size-4 place-items-center rounded-full" style={{ background: 'var(--tint-green)' }}>
-                    <Icon.Check className="size-3" />
-                  </span>
-                  {r.text}
+                <div key={r.id} className="py-0.5 pl-3.5">
+                  <ToolChip tool={r.tool} />
                 </div>
               );
             }
             return (
-              <div key={r.id} className="flex gap-2.5">
-                <AgentAvatar />
-                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tl-md bg-surface-2/70 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink/90">
-                  {r.text}
+              <div key={r.id} className="relative max-w-[94%] pl-3.5">
+                <AccentRail />
+                <div className="space-y-2.5">
+                  {r.texts.map((t, i) => (
+                    <p key={i} className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink/90">
+                      {t}
+                    </p>
+                  ))}
                 </div>
               </div>
             );
           })
         )}
 
-        {running && (
-          <div className="flex gap-2.5">
-            <AgentAvatar />
-            <div className="flex items-center gap-1 rounded-2xl rounded-tl-md bg-surface-2/70 px-3.5 py-3">
+        {showTyping && (
+          <div className="relative pl-3.5">
+            <AccentRail pulsing />
+            <div className="flex h-5 items-center gap-1">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
                   className="size-1.5 animate-bounce rounded-full bg-ink-faint"
-                  style={{ animationDelay: `${i * 140}ms`, animationDuration: '1s' }}
+                  style={{ animationDelay: `${i * 140}ms`, animationDuration: '0.9s' }}
                 />
               ))}
             </div>
@@ -202,38 +341,52 @@ export function ReviewAssistant({ listing, disabled }: { listing: ListingDetail;
       </div>
 
       {/* Composer */}
-      <div className="border-t border-hairline p-3">
+      <div className="shrink-0 border-t border-hairline bg-surface-2/40 p-3">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void sendText(input);
           }}
-          className="flex items-end gap-2 rounded-2xl border border-hairline bg-surface-2 px-3 py-2 transition-colors focus-within:border-[var(--ebay-blue)]"
+          className="rounded-2xl border border-hairline bg-surface shadow-raised transition-[border-color,box-shadow] duration-150 focus-within:border-[color:var(--ebay-blue)] focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--ebay-blue)_15%,transparent)]"
         >
-          <textarea
-            ref={taRef}
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void sendText(input);
+          <div className="flex items-end gap-2 py-2 pl-3.5 pr-2">
+            <textarea
+              ref={taRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void sendText(input);
+                }
+              }}
+              placeholder={running ? 'Working on it…' : 'Ask, or tell me to change something…'}
+              disabled={running}
+              className="max-h-[120px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-relaxed text-ink outline-none placeholder:text-ink-faint disabled:opacity-60"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || running}
+              aria-label={running ? 'Agent is working' : 'Send message'}
+              className="grid size-8 shrink-0 place-items-center rounded-full transition-[background-color,color,transform,opacity] duration-150 hover:enabled:-translate-y-px active:enabled:scale-95 disabled:cursor-not-allowed"
+              style={
+                running
+                  ? {
+                      background: 'var(--surface-2)',
+                      color: 'var(--ink-faint)',
+                      boxShadow: 'inset 0 0 0 1px var(--hairline-strong)',
+                    }
+                  : { background: 'var(--ebay-blue)', color: '#fff', opacity: input.trim() ? 1 : 0.4 }
               }
-            }}
-            placeholder={running ? 'The agent is working…' : 'Ask, or tell me to change something…'}
-            disabled={running}
-            className="max-h-[120px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-relaxed text-ink outline-none placeholder:text-ink-faint disabled:opacity-60"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || running}
-            aria-label="Send"
-            className="grid size-9 shrink-0 place-items-center rounded-xl text-white transition-all hover:-translate-y-px active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ background: 'var(--ebay-blue)' }}
-          >
-            <Icon.ArrowUpRight className="size-[17px]" />
-          </button>
+            >
+              {running ? (
+                <span className="size-2.5 rounded-[3px] bg-current" />
+              ) : (
+                <Icon.ArrowUpRight className="size-4" strokeWidth={1.8} />
+              )}
+            </button>
+          </div>
         </form>
         <p className="mt-1.5 px-1 text-[11px] text-ink-faint">
           Enter to send · Shift+Enter for a new line · edits update the page live

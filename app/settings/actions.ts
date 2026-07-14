@@ -5,7 +5,7 @@ import { getDb } from '@/lib/db/client';
 import { setSetting } from '@/lib/db/repos/settings';
 import { getEbayAdapter, isLiveBackend } from '@/lib/ebay';
 import { importListings } from '@/lib/agent/steps/import';
-import { MODEL_OPTIONS } from './model-options';
+import { isValidGatewayModelId } from './model-options';
 
 const DEFAULT_KEYS = new Set([
   'ship_zip',
@@ -85,7 +85,7 @@ export async function importEbayListingsAction(): Promise<ImportActionResult> {
 }
 
 export async function setModelAction(model: string): Promise<{ ok: boolean }> {
-  if (!MODEL_OPTIONS.some((o) => o.value === model)) return { ok: false };
+  if (!isValidGatewayModelId(model)) return { ok: false };
   await setSetting(getDb(), 'model', model);
   revalidatePath('/settings');
   return { ok: true };

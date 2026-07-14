@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/icons';
 import { publishListingAction, rejectListingAction } from '@/app/listings/[id]/actions';
+import { DeleteDraftButton } from '@/components/queue/delete-draft-button';
 
 type State =
   | { kind: 'idle' }
@@ -74,6 +75,7 @@ export function ActionBar({
 
         {!live && !sentback && (
           <div className="flex items-center gap-2.5">
+            <DeleteDraftButton listingId={listingId} redirectTo="/" subtle />
             <button
               onClick={reject}
               disabled={pending || disabled}

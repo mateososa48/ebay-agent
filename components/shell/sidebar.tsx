@@ -9,6 +9,7 @@ import { cn } from '@/lib/ui/cn';
 import { ThemeToggle } from './theme-toggle';
 
 const NAV = [
+  { href: '/overview', label: 'Overview', icon: Icon.Trend },
   { href: '/', label: 'Review Queue', icon: Icon.Queue },
   { href: '/new', label: 'New Item', icon: Icon.Camera },
   { href: '/listings', label: 'Listings', icon: Icon.Grid },

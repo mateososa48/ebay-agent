@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { QueueDraft } from '@/lib/sample-data';
 import { Card, Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
+import { DeleteDraftButton } from './delete-draft-button';
 
 function agoLabel(min: number): string {
   if (min < 60) return `${min}m ago`;
@@ -56,9 +57,14 @@ export function DraftCard({ draft, index }: { draft: QueueDraft; index: number }
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[12px] text-ink-faint">
-          <Icon.Clock className="size-3.5" />
-          drafted {agoLabel(draft.agedMinutes)}
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-[12px] text-ink-faint">
+            <Icon.Clock className="size-3.5" />
+            drafted {agoLabel(draft.agedMinutes)}
+          </span>
+          <span className="opacity-0 transition-opacity group-hover:opacity-100">
+            <DeleteDraftButton listingId={draft.id} />
+          </span>
         </div>
       </div>
 
@@ -67,7 +73,9 @@ export function DraftCard({ draft, index }: { draft: QueueDraft; index: number }
         <div>
           <div className="font-mono text-[11px] uppercase tracking-wider text-ink-faint">Suggested</div>
           <div className="mt-0.5 flex items-baseline gap-1">
-            <span className="font-display text-[26px] font-bold leading-none text-ink tnum">${draft.price}</span>
+            <span className="font-display text-[26px] font-bold leading-none text-ink tnum">
+              ${Number.isInteger(draft.price) ? draft.price : draft.price.toFixed(2)}
+            </span>
           </div>
           <div className="mt-1.5 flex items-center gap-1 text-[12px] text-ink-muted">
             <Icon.Trend className="size-3.5 text-[var(--ebay-green-deep)]" />

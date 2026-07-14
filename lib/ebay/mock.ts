@@ -10,6 +10,7 @@ import type {
   SendOfferInput,
   EbayActiveListing,
   EbayItemDetails,
+  EbayListingStats,
 } from './types';
 import type { ItemIdentity, Comp } from '../types';
 
@@ -105,5 +106,9 @@ export class MockEbayAdapter implements EbayAdapter {
 
   async reviseListingPrice(_input: { ebayListingId: string; priceUsd: number }): Promise<void> {
     /* no-op */
+  }
+
+  async getListingStats(_ebayListingId: string): Promise<EbayListingStats | null> {
+    return null;
   }
 }

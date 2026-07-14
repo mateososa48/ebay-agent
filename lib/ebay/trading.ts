@@ -1,6 +1,13 @@
 // lib/ebay/trading.ts
 import { ebayApiBase, getUserAccessToken } from './oauth';
-import type { EbaySale, EbayBuyerQuestion, BuyerReplyInput, EbayActiveListing, EbayItemDetails } from './types';
+import type {
+  EbaySale,
+  EbayBuyerQuestion,
+  BuyerReplyInput,
+  EbayActiveListing,
+  EbayItemDetails,
+  EbayListingStats,
+} from './types';
 
 /** Minimal XML escaping for text nodes we embed in Trading requests. */
 function xmlEscape(s: string): string {
@@ -144,6 +151,41 @@ export async function getItemDetails(ebayListingId: string): Promise<EbayItemDet
 </GetItemRequest>`,
   );
   return parseItemDetails(xml);
+}
+
+/** Pull watch/view/sold counts out of a GetItem XML response. */
+export function parseListingStats(xml: string): EbayListingStats | null {
+  const ebayListingId = xml.match(/<ItemID>(\d+)<\/ItemID>/)?.[1];
+  if (!ebayListingId) return null;
+  const num = (re: RegExp) => {
+    const raw = xml.match(re)?.[1];
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  };
+  return {
+    ebayListingId,
+    watchCount: num(/<WatchCount>(\d+)<\/WatchCount>/),
+    hitCount: num(/<HitCount>(\d+)<\/HitCount>/),
+    quantitySold: num(/<QuantitySold>(\d+)<\/QuantitySold>/),
+  };
+}
+
+/** Watch/view/sold counts for one listing (Trading GetItem, light response). Read-only. */
+export async function getListingStats(ebayListingId: string): Promise<EbayListingStats | null> {
+  const xml = await tradingFetch(
+    'GetItem',
+    `<?xml version="1.0" encoding="utf-8"?>
+<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>${xmlEscape(ebayListingId)}</ItemID>
+  <IncludeWatchCount>true</IncludeWatchCount>
+  <OutputSelector>Item.ItemID</OutputSelector>
+  <OutputSelector>Item.WatchCount</OutputSelector>
+  <OutputSelector>Item.HitCount</OutputSelector>
+  <OutputSelector>Item.SellingStatus.QuantitySold</OutputSelector>
+</GetItemRequest>`,
+  );
+  return parseListingStats(xml);
 }
 
 /** Change the price of a live fixed-price listing (Trading ReviseFixedPriceItem). WRITE. */

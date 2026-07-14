@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/icons';
 import { getEbayStatus } from '@/lib/queries';
 import { getDb } from '@/lib/db/client';
 import { getSetting, getListingDefaults, DEFAULT_LISTING_DEFAULTS } from '@/lib/db/repos/settings';
-import { getAiSpend } from '@/lib/ai/spend';
+import { getAiSpend, getGatewayModels } from '@/lib/ai/spend';
 import { ModelSelector } from '@/components/settings/model-selector';
 import { ListingDefaultsForm } from '@/components/settings/listing-defaults';
 import { AutomationForm, type AutomationSettings } from '@/components/settings/automation';
@@ -29,7 +29,7 @@ function Section({ title, desc, children }: { title: string; desc: string; child
 
 export default async function SettingsPage() {
   const ebay = await getEbayStatus();
-  const spend = await getAiSpend();
+  const [spend, catalog] = await Promise.all([getAiSpend(), getGatewayModels()]);
   // getDb() throws synchronously if DATABASE_URL is briefly unset; guard it so a DB
   // blip degrades to safe defaults instead of 500-ing the one page used to reconnect.
   let model = 'openai/gpt-5.4';
@@ -137,7 +137,7 @@ export default async function SettingsPage() {
                 <div className="text-[14px] font-medium text-ink">Writing model</div>
                 <div className="mt-0.5 text-[13px] text-ink-muted">The model that identifies, prices, and writes — switches live.</div>
               </div>
-              <ModelSelector current={model} />
+              <ModelSelector current={model} catalog={catalog} />
             </div>
             <div className="flex items-center justify-between pt-4">
               <div>
