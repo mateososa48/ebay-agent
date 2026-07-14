@@ -1,0 +1,30 @@
+name: Buyer-automation poller
+
+# The Vercel account is on the Hobby plan, which caps native cron at once/day.
+# This free GitHub Actions schedule drives the real (sub-daily) cadence by pinging
+# the app's own poll endpoint. GitHub's scheduler is best-effort (can run late), which
+# is fine for checking eBay every ~15 min. The daily Vercel cron (vercel.json) is a
+# safety net if Actions is delayed.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+# Don't pile up runs if one is slow.
+concurrency:
+  group: buyer-automation-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the poll endpoint
+        run: |
+          code=$(curl -s -o /tmp/body -w "%{http_code}" -m 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://ebay-agent-omega.vercel.app/api/cron/poll)
+          echo "HTTP $code"
+          cat /tmp/body
+          # Fail the run on a server/auth error so it surfaces in the Actions tab.
+          test "$code" = "200"
