@@ -157,9 +157,11 @@ export default async function SettingsPage() {
               </div>
             ) : (
               <div className="text-[13px] leading-relaxed text-ink-muted">
-                To show your live balance here, add an{' '}
-                <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[12px] text-ink">AI_GATEWAY_API_KEY</code>{' '}
-                env var (from your Vercel AI Gateway settings). Your exact spend is always in the{' '}
+                The agent bills through Vercel&rsquo;s AI Gateway and authenticates automatically (via OIDC) — no key
+                needed for it to run, which is why there isn&rsquo;t one set. Showing the live balance <em>here</em> is
+                optional and needs a read-only{' '}
+                <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[12px] text-ink">AI_GATEWAY_API_KEY</code>.
+                Either way, your exact spend is always in the{' '}
                 <a
                   href="https://vercel.com/d?to=%2F%5Bteam%5D%2F~%2Fai"
                   target="_blank"
