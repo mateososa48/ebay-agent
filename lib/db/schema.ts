@@ -79,6 +79,9 @@ export const SCHEMA_STATEMENTS: string[] = [
   `create index if not exists idx_events_item on events(item_id)`,
   `alter table listings add column if not exists condition text`,
   `alter table listings add column if not exists ebay_category_id text`,
+  `alter table listings add column if not exists sold_at timestamptz`,
+  `alter table listings add column if not exists sale_price numeric(10,2)`,
+  `create index if not exists idx_listings_ebay_id on listings(ebay_listing_id)`,
 ];
 
 export async function applySchema(db: Db): Promise<void> {

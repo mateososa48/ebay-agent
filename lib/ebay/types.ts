@@ -33,6 +33,15 @@ export interface VerifyResult {
   errors: string[]; // eBay error LongMessages; empty when ok
 }
 
+/** A recently-sold item as reported by eBay (Trading GetSellerTransactions). */
+export interface EbaySale {
+  ebayListingId: string; // eBay ItemID
+  salePrice: number; // USD
+  soldAt: string | null; // ISO; null if eBay didn't return a timestamp
+  title?: string;
+  transactionId?: string;
+}
+
 /**
  * The single seam between the agent and eBay. Two implementations exist:
  * `mock` (deterministic fixtures, used everywhere until the keyset lands) and
@@ -44,4 +53,6 @@ export interface EbayAdapter {
   findComps(query: { identity: ItemIdentity }): Promise<Comp[]>;
   verifyListing(input: PublishListingInput): Promise<VerifyResult>;
   publishListing(input: PublishListingInput): Promise<PublishResult>;
+  /** Recently-sold items, for autonomous sale detection. Read-only. */
+  getRecentSales(days?: number): Promise<EbaySale[]>;
 }

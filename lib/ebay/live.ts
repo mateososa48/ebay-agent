@@ -1,9 +1,9 @@
-import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult } from './types';
+import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult, EbaySale } from './types';
 import type { ItemIdentity, Comp } from '../types';
 import { MockEbayAdapter } from './mock';
 import { getAppToken, ebayApiBase } from './oauth';
 import { buildFixedPriceItemXml } from './listing-xml';
-import { tradingRequest } from './trading';
+import { tradingRequest, getRecentSales } from './trading';
 
 interface BrowseItemSummary {
   itemId?: string;
@@ -53,6 +53,10 @@ export class LiveEbayAdapter implements EbayAdapter {
       throw new Error(res.errors.join('; ') || `eBay AddFixedPriceItem returned ${res.ack}`);
     }
     return { ebayListingId: res.itemId, url: `https://www.ebay.com/itm/${res.itemId}` };
+  }
+
+  getRecentSales(days?: number): Promise<EbaySale[]> {
+    return getRecentSales(days);
   }
 
   private async browseComps(identity: ItemIdentity): Promise<Comp[]> {

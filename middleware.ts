@@ -17,6 +17,8 @@ const PUBLIC_PATHS = [
   '/privacy',
   '/api/ebay/callback',
   '/api/health',
+  // Vercel Cron invokes this with no desk_auth cookie; the route self-guards with CRON_SECRET.
+  '/api/cron',
   '/eve',
   '/.well-known',
 ];

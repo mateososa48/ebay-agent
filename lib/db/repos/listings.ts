@@ -14,6 +14,8 @@ export interface ListingRow {
   linterReport: unknown;
   condition: string | null;
   ebayCategoryId: string | null;
+  soldAt: string | null;
+  salePrice: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +33,8 @@ interface RawListing {
   linter_report: unknown;
   condition: string | null;
   ebay_category_id: string | null;
+  sold_at: string | Date | null;
+  sale_price: string | null;
   created_at: string | Date;
   updated_at: string | Date;
 }
@@ -50,6 +54,8 @@ function mapListing(r: RawListing): ListingRow {
     linterReport: r.linter_report,
     condition: r.condition,
     ebayCategoryId: r.ebay_category_id,
+    soldAt: r.sold_at === null || r.sold_at === undefined ? null : new Date(r.sold_at).toISOString(),
+    salePrice: r.sale_price === null || r.sale_price === undefined ? null : Number(r.sale_price),
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
   };
@@ -100,6 +106,32 @@ export async function getListingByItem(db: Db, itemId: string): Promise<ListingR
   );
   const row = rows[0];
   return row ? mapListing(row) : null;
+}
+
+export async function getListingByEbayId(db: Db, ebayListingId: string): Promise<ListingRow | null> {
+  const { rows } = await db.query<RawListing>(
+    `select * from listings where ebay_listing_id = $1 order by created_at desc, ctid desc limit 1`,
+    [ebayListingId],
+  );
+  const row = rows[0];
+  return row ? mapListing(row) : null;
+}
+
+/** Mark a listing sold (autonomous sale detection). Idempotent at the caller. */
+export async function markSold(
+  db: Db,
+  id: string,
+  input: { salePrice?: number | null; soldAt?: string | null },
+): Promise<void> {
+  await db.query(
+    `update listings
+       set status = 'sold',
+           sale_price = $2,
+           sold_at = coalesce($3::timestamptz, now()),
+           updated_at = now()
+     where id = $1`,
+    [id, input.salePrice ?? null, input.soldAt ?? null],
+  );
 }
 
 export async function listListings(db: Db): Promise<ListingRow[]> {

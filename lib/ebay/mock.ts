@@ -1,4 +1,4 @@
-import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult } from './types';
+import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult, EbaySale } from './types';
 import type { ItemIdentity, Comp } from '../types';
 
 /** Tiny deterministic hash so mock output is stable per input (no Math.random). */
@@ -61,5 +61,9 @@ export class MockEbayAdapter implements EbayAdapter {
   async publishListing(input: PublishListingInput): Promise<PublishResult> {
     const id = `MOCK-${hashString(input.title + input.price)}`;
     return { ebayListingId: id, url: `https://mock.ebay.local/itm/${id}` };
+  }
+
+  async getRecentSales(_days?: number): Promise<EbaySale[]> {
+    return [];
   }
 }
