@@ -1,9 +1,20 @@
-import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult, EbaySale } from './types';
+import type {
+  EbayAdapter,
+  IdentifyByImageInput,
+  PublishResult,
+  PublishListingInput,
+  VerifyResult,
+  EbaySale,
+  EbayBuyerQuestion,
+  BuyerReplyInput,
+  SendOfferInput,
+} from './types';
 import type { ItemIdentity, Comp } from '../types';
 import { MockEbayAdapter } from './mock';
 import { getAppToken, ebayApiBase } from './oauth';
 import { buildFixedPriceItemXml } from './listing-xml';
-import { tradingRequest, getRecentSales } from './trading';
+import { tradingRequest, getRecentSales, getBuyerQuestions, replyToBuyerQuestion } from './trading';
+import { getEligibleOfferListingIds, sendOfferToInterestedBuyers } from './negotiation';
 
 interface BrowseItemSummary {
   itemId?: string;
@@ -57,6 +68,22 @@ export class LiveEbayAdapter implements EbayAdapter {
 
   getRecentSales(days?: number): Promise<EbaySale[]> {
     return getRecentSales(days);
+  }
+
+  getBuyerQuestions(days?: number): Promise<EbayBuyerQuestion[]> {
+    return getBuyerQuestions(days);
+  }
+
+  replyToBuyerQuestion(input: BuyerReplyInput): Promise<void> {
+    return replyToBuyerQuestion(input);
+  }
+
+  getEligibleOfferListingIds(): Promise<string[]> {
+    return getEligibleOfferListingIds();
+  }
+
+  sendOfferToInterestedBuyers(input: SendOfferInput): Promise<void> {
+    return sendOfferToInterestedBuyers(input);
   }
 
   private async browseComps(identity: ItemIdentity): Promise<Comp[]> {

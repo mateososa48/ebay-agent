@@ -82,6 +82,32 @@ export const SCHEMA_STATEMENTS: string[] = [
   `alter table listings add column if not exists sold_at timestamptz`,
   `alter table listings add column if not exists sale_price numeric(10,2)`,
   `create index if not exists idx_listings_ebay_id on listings(ebay_listing_id)`,
+  `create table if not exists buyer_messages (
+     id uuid primary key default gen_random_uuid(),
+     ebay_message_id text not null unique,
+     listing_id uuid references listings(id) on delete set null,
+     sender text,
+     subject text,
+     question text not null,
+     drafted_reply text,
+     status text not null default 'drafted'
+       check (status in ('drafted','sent','skipped')),
+     created_at timestamptz not null default now(),
+     updated_at timestamptz not null default now()
+   )`,
+  `create table if not exists offers (
+     id uuid primary key default gen_random_uuid(),
+     listing_id uuid not null references listings(id) on delete cascade,
+     discount_pct numeric(5,2) not null,
+     offer_price numeric(10,2) not null,
+     message text,
+     status text not null default 'drafted'
+       check (status in ('drafted','sent','skipped')),
+     created_at timestamptz not null default now(),
+     updated_at timestamptz not null default now()
+   )`,
+  `create index if not exists idx_buyer_messages_status on buyer_messages(status)`,
+  `create index if not exists idx_offers_listing on offers(listing_id)`,
 ];
 
 export async function applySchema(db: Db): Promise<void> {

@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import { AppShell } from '@/components/shell/app-shell';
 import { DraftCard } from '@/components/queue/draft-card';
+import { ReplyCard } from '@/components/queue/reply-card';
+import { OfferCard } from '@/components/queue/offer-card';
+import { ActivityFeed } from '@/components/queue/activity-feed';
 import { Button, Eyebrow } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
 import type { QueueDraft } from '@/lib/sample-data';
-import { getQueueDrafts, getListingCounts } from '@/lib/queries';
+import { getQueueDrafts, getListingCounts, getPendingReplies, getPendingOffers, getRecentActivity } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +36,11 @@ export default async function QueuePage() {
   } catch {
     /* ignore */
   }
+  const [replies, offers, activity] = await Promise.all([
+    getPendingReplies(),
+    getPendingOffers(),
+    getRecentActivity(8),
+  ]);
   const stats = {
     awaiting: drafts.length,
     live: counts.live,
@@ -101,6 +109,30 @@ export default async function QueuePage() {
           </div>
         )}
       </section>
+
+      {(replies.length > 0 || offers.length > 0) && (
+        <section className="mt-10">
+          <div className="reveal flex items-center justify-between">
+            <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em] text-ink">
+              Buyer actions to approve{' '}
+              <span className="text-ink-faint tnum">· {replies.length + offers.length}</span>
+            </h2>
+          </div>
+          <p className="mt-1 text-[13px] text-ink-muted">
+            Drafted by your agent — nothing reaches a buyer until you approve it.
+          </p>
+          <div className="mt-4 grid gap-4">
+            {replies.map((r) => (
+              <ReplyCard key={r.id} reply={r} />
+            ))}
+            {offers.map((o) => (
+              <OfferCard key={o.id} offer={o} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <ActivityFeed items={activity} />
     </AppShell>
   );
 }

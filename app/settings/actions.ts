@@ -5,7 +5,18 @@ import { getDb } from '@/lib/db/client';
 import { setSetting } from '@/lib/db/repos/settings';
 import { MODEL_OPTIONS } from './model-options';
 
-const DEFAULT_KEYS = new Set(['ship_zip', 'ship_mode', 'ship_cost', 'return_window', 'handling_days', 'require_approval']);
+const DEFAULT_KEYS = new Set([
+  'ship_zip',
+  'ship_mode',
+  'ship_cost',
+  'return_window',
+  'handling_days',
+  'require_approval',
+  'automation_sales',
+  'automation_messages',
+  'automation_offers',
+  'offer_discount_pct',
+]);
 
 export async function setListingDefaultAction(key: string, value: string): Promise<{ ok: boolean }> {
   if (!DEFAULT_KEYS.has(key)) return { ok: false };
@@ -20,8 +31,17 @@ export async function setListingDefaultAction(key: string, value: string): Promi
       if (v !== 'days_30' && v !== 'days_60' && v !== 'none') return { ok: false };
       break;
     case 'require_approval':
+    case 'automation_sales':
+    case 'automation_messages':
+    case 'automation_offers':
       if (v !== 'true' && v !== 'false') return { ok: false };
       break;
+    case 'offer_discount_pct': {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 1 || n > 50) return { ok: false };
+      v = String(n);
+      break;
+    }
     case 'ship_cost': {
       const n = Number(v);
       if (!Number.isFinite(n) || n < 0) return { ok: false };

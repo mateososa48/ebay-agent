@@ -42,6 +42,30 @@ export interface EbaySale {
   transactionId?: string;
 }
 
+/** An unanswered buyer question (Trading GetMemberMessages). */
+export interface EbayBuyerQuestion {
+  messageId: string; // eBay MessageID — dedupe key
+  ebayListingId: string; // ItemID the question is about
+  senderId: string; // buyer username (RecipientID for the reply)
+  subject?: string;
+  body: string;
+}
+
+/** Send a reply to a buyer question (Trading AddMemberMessageRTQ). */
+export interface BuyerReplyInput {
+  ebayListingId: string;
+  recipientId: string;
+  parentMessageId: string;
+  body: string;
+}
+
+/** Send a discount offer to interested buyers (Negotiation API). */
+export interface SendOfferInput {
+  ebayListingId: string;
+  priceUsd: number;
+  message?: string;
+}
+
 /**
  * The single seam between the agent and eBay. Two implementations exist:
  * `mock` (deterministic fixtures, used everywhere until the keyset lands) and
@@ -55,4 +79,12 @@ export interface EbayAdapter {
   publishListing(input: PublishListingInput): Promise<PublishResult>;
   /** Recently-sold items, for autonomous sale detection. Read-only. */
   getRecentSales(days?: number): Promise<EbaySale[]>;
+  /** Unanswered buyer questions on the seller's items. Read-only. */
+  getBuyerQuestions(days?: number): Promise<EbayBuyerQuestion[]>;
+  /** Reply to a buyer question. WRITE — only called after human approval. */
+  replyToBuyerQuestion(input: BuyerReplyInput): Promise<void>;
+  /** eBay ItemIDs of live listings eligible for offers-to-interested-buyers. Read-only. */
+  getEligibleOfferListingIds(): Promise<string[]>;
+  /** Send a discount offer to interested buyers. WRITE — only called after human approval. */
+  sendOfferToInterestedBuyers(input: SendOfferInput): Promise<void>;
 }

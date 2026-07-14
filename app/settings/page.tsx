@@ -10,6 +10,7 @@ import { getSetting, getListingDefaults, DEFAULT_LISTING_DEFAULTS } from '@/lib/
 import { getAiSpend } from '@/lib/ai/spend';
 import { ModelSelector } from '@/components/settings/model-selector';
 import { ListingDefaultsForm } from '@/components/settings/listing-defaults';
+import { AutomationForm, type AutomationSettings } from '@/components/settings/automation';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,10 +33,18 @@ export default async function SettingsPage() {
   // blip degrades to safe defaults instead of 500-ing the one page used to reconnect.
   let model = 'openai/gpt-5.4';
   let defaults = DEFAULT_LISTING_DEFAULTS;
+  let automation: AutomationSettings = { sales: true, messages: true, offers: true, discountPct: 10 };
   try {
     const db = getDb();
     model = (await getSetting(db, 'model')) ?? model;
     defaults = await getListingDefaults(db);
+    const pct = Number((await getSetting(db, 'offer_discount_pct')) ?? 10);
+    automation = {
+      sales: (await getSetting(db, 'automation_sales')) !== 'false',
+      messages: (await getSetting(db, 'automation_messages')) !== 'false',
+      offers: (await getSetting(db, 'automation_offers')) !== 'false',
+      discountPct: Number.isFinite(pct) ? pct : 10,
+    };
   } catch {
     /* DB unavailable — render with safe defaults */
   }
@@ -107,12 +116,9 @@ export default async function SettingsPage() {
           </Card>
         </Section>
 
-        <Section title="Buyer automation" desc="Hands-off selling once your items are live.">
-          <Card className="p-5">
-            <p className="text-[13px] leading-relaxed text-ink-muted">
-              Auto-sending offers to watchers and auto-replying to buyer questions are{' '}
-              <strong className="text-ink">coming soon</strong>. Publishing is live now; the after-it&rsquo;s-listed half is next on the roadmap.
-            </p>
+        <Section title="Buyer automation" desc="Hands-off selling once your items are live. Anything buyer-facing waits for your approval on the queue.">
+          <Card className="p-0">
+            <AutomationForm settings={automation} />
           </Card>
         </Section>
 

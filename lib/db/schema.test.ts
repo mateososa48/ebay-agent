@@ -14,7 +14,17 @@ describe('applySchema', () => {
       `select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
     const names = rows.map((r) => r.table_name);
-    expect(names).toEqual(['app_settings', 'approvals', 'comps', 'ebay_connection', 'events', 'items', 'listings']);
+    expect(names).toEqual([
+      'app_settings',
+      'approvals',
+      'buyer_messages',
+      'comps',
+      'ebay_connection',
+      'events',
+      'items',
+      'listings',
+      'offers',
+    ]);
   });
 
   it('is idempotent (safe to apply twice)', async () => {

@@ -136,11 +136,128 @@ export async function getEbayStatus(): Promise<EbayStatus> {
 export async function getPendingApprovalCount(): Promise<number> {
   try {
     const { rows } = await getDb().query<{ n: string | number }>(
-      `select count(*) as n from approvals where state = 'pending' and type = 'listing'`,
+      `select count(*) as n from approvals where state = 'pending'`,
     );
     return Number(rows[0]?.n ?? 0);
   } catch {
     return 0;
+  }
+}
+
+export interface PendingReply {
+  id: string;
+  sender: string | null;
+  subject: string | null;
+  question: string;
+  draftedReply: string;
+  listingId: string | null;
+  listingTitle: string | null;
+  createdAt: string;
+}
+
+/** Drafted buyer replies awaiting approval, newest first. Never throws. */
+export async function getPendingReplies(): Promise<PendingReply[]> {
+  try {
+    const { rows } = await getDb().query<{
+      id: string;
+      sender: string | null;
+      subject: string | null;
+      question: string;
+      drafted_reply: string | null;
+      listing_id: string | null;
+      listing_title: string | null;
+      created_at: string | Date;
+    }>(
+      `select bm.id, bm.sender, bm.subject, bm.question, bm.drafted_reply, bm.listing_id, l.title as listing_title, bm.created_at
+       from buyer_messages bm
+       left join listings l on l.id = bm.listing_id
+       where bm.status = 'drafted'
+       order by bm.created_at desc`,
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      sender: r.sender,
+      subject: r.subject,
+      question: r.question,
+      draftedReply: r.drafted_reply ?? '',
+      listingId: r.listing_id,
+      listingTitle: r.listing_title,
+      createdAt: new Date(r.created_at).toISOString(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export interface PendingOffer {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  listPrice: number | null;
+  offerPrice: number;
+  discountPct: number;
+  message: string | null;
+  createdAt: string;
+}
+
+/** Drafted watcher offers awaiting approval, newest first. Never throws. */
+export async function getPendingOffers(): Promise<PendingOffer[]> {
+  try {
+    const { rows } = await getDb().query<{
+      id: string;
+      listing_id: string;
+      title: string;
+      price: string | null;
+      offer_price: string;
+      discount_pct: string;
+      message: string | null;
+      created_at: string | Date;
+    }>(
+      `select o.id, o.listing_id, l.title, l.price, o.offer_price, o.discount_pct, o.message, o.created_at
+       from offers o
+       join listings l on l.id = o.listing_id
+       where o.status = 'drafted'
+       order by o.created_at desc`,
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      listingId: r.listing_id,
+      listingTitle: r.title,
+      listPrice: r.price === null ? null : Number(r.price),
+      offerPrice: Number(r.offer_price),
+      discountPct: Number(r.discount_pct),
+      message: r.message,
+      createdAt: new Date(r.created_at).toISOString(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export interface ActivityEntry {
+  id: string;
+  kind: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+}
+
+const ACTIVITY_KINDS = ['sale.detected', 'message.drafted', 'message.sent', 'offer.drafted', 'offer.sent'];
+
+/** Recent buyer-automation activity for the dashboard feed. Never throws. */
+export async function getRecentActivity(limit = 10): Promise<ActivityEntry[]> {
+  try {
+    const { rows } = await getDb().query<{ id: string; kind: string; data: unknown; created_at: string | Date }>(
+      `select id, kind, data, created_at from events where kind = any($1) order by created_at desc limit $2`,
+      [ACTIVITY_KINDS, limit],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      data: (r.data as Record<string, unknown>) ?? {},
+      createdAt: new Date(r.created_at).toISOString(),
+    }));
+  } catch {
+    return [];
   }
 }
 

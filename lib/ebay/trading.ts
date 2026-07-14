@@ -1,6 +1,11 @@
 // lib/ebay/trading.ts
 import { ebayApiBase, getUserAccessToken } from './oauth';
-import type { EbaySale } from './types';
+import type { EbaySale, EbayBuyerQuestion, BuyerReplyInput } from './types';
+
+/** Minimal XML escaping for text nodes we embed in Trading requests. */
+function xmlEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 export interface TradingResponse {
   ack: string;
@@ -85,6 +90,66 @@ export function parseSellerTransactions(xml: string): EbaySale[] {
     });
   }
   return sales;
+}
+
+/** Pull unanswered buyer questions out of a GetMemberMessages XML response. */
+export function parseMemberMessages(xml: string): EbayBuyerQuestion[] {
+  const out: EbayBuyerQuestion[] = [];
+  for (const ex of xml.match(/<MemberMessageExchange>[\s\S]*?<\/MemberMessageExchange>/g) ?? []) {
+    const status = ex.match(/<MessageStatus>(\w+)<\/MessageStatus>/)?.[1];
+    if (status && status !== 'Unanswered') continue;
+    const ebayListingId = ex.match(/<ItemID>(\d+)<\/ItemID>/)?.[1];
+    const q = ex.match(/<Question>[\s\S]*?<\/Question>/)?.[0] ?? ex;
+    const messageId = q.match(/<MessageID>([^<]+)<\/MessageID>/)?.[1];
+    const senderId = q.match(/<SenderID>([^<]+)<\/SenderID>/)?.[1];
+    const body = q.match(/<Body>([\s\S]*?)<\/Body>/)?.[1]?.trim();
+    if (!ebayListingId || !messageId || !senderId || !body) continue;
+    out.push({
+      messageId,
+      ebayListingId,
+      senderId,
+      subject: q.match(/<Subject>([\s\S]*?)<\/Subject>/)?.[1]?.trim(),
+      body,
+    });
+  }
+  return out;
+}
+
+/** Unanswered buyer questions from the last N days (Trading GetMemberMessages). Read-only. */
+export async function getBuyerQuestions(days = 14, now = new Date()): Promise<EbayBuyerQuestion[]> {
+  const end = now.toISOString();
+  const start = new Date(now.getTime() - days * 86400_000).toISOString();
+  const xml = await tradingFetch(
+    'GetMemberMessages',
+    `<?xml version="1.0" encoding="utf-8"?>
+<GetMemberMessagesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <MailMessageType>AskSellerQuestion</MailMessageType>
+  <MessageStatus>Unanswered</MessageStatus>
+  <StartCreationTime>${start}</StartCreationTime>
+  <EndCreationTime>${end}</EndCreationTime>
+  <Pagination><EntriesPerPage>50</EntriesPerPage><PageNumber>1</PageNumber></Pagination>
+</GetMemberMessagesRequest>`,
+  );
+  return parseMemberMessages(xml);
+}
+
+/** Reply to a buyer question (Trading AddMemberMessageRTQ). WRITE — call only after approval. */
+export async function replyToBuyerQuestion(input: BuyerReplyInput): Promise<void> {
+  const res = await tradingRequest(
+    'AddMemberMessageRTQ',
+    `<?xml version="1.0" encoding="utf-8"?>
+<AddMemberMessageRTQRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>${xmlEscape(input.ebayListingId)}</ItemID>
+  <MemberMessage>
+    <Body>${xmlEscape(input.body)}</Body>
+    <ParentMessageID>${xmlEscape(input.parentMessageId)}</ParentMessageID>
+    <RecipientID>${xmlEscape(input.recipientId)}</RecipientID>
+  </MemberMessage>
+</AddMemberMessageRTQRequest>`,
+  );
+  if (res.ack !== 'Success' && res.ack !== 'Warning') {
+    throw new Error(res.errors.join('; ') || `eBay AddMemberMessageRTQ returned ${res.ack}`);
+  }
 }
 
 /** Recently-sold items for the connected seller (Trading GetSellerTransactions). Read-only. */

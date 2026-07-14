@@ -1,4 +1,14 @@
-import type { EbayAdapter, IdentifyByImageInput, PublishResult, PublishListingInput, VerifyResult, EbaySale } from './types';
+import type {
+  EbayAdapter,
+  IdentifyByImageInput,
+  PublishResult,
+  PublishListingInput,
+  VerifyResult,
+  EbaySale,
+  EbayBuyerQuestion,
+  BuyerReplyInput,
+  SendOfferInput,
+} from './types';
 import type { ItemIdentity, Comp } from '../types';
 
 /** Tiny deterministic hash so mock output is stable per input (no Math.random). */
@@ -65,5 +75,21 @@ export class MockEbayAdapter implements EbayAdapter {
 
   async getRecentSales(_days?: number): Promise<EbaySale[]> {
     return [];
+  }
+
+  async getBuyerQuestions(_days?: number): Promise<EbayBuyerQuestion[]> {
+    return [];
+  }
+
+  async replyToBuyerQuestion(_input: BuyerReplyInput): Promise<void> {
+    /* no-op */
+  }
+
+  async getEligibleOfferListingIds(): Promise<string[]> {
+    return [];
+  }
+
+  async sendOfferToInterestedBuyers(_input: SendOfferInput): Promise<void> {
+    /* no-op */
   }
 }

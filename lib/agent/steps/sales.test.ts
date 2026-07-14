@@ -12,6 +12,10 @@ function fakeAdapter(sales: EbaySale[]): EbayAdapter {
     verifyListing: async () => ({ ok: true, errors: [] }),
     publishListing: async () => ({ ebayListingId: 'x', url: 'x' }),
     getRecentSales: async () => sales,
+    getBuyerQuestions: async () => [],
+    replyToBuyerQuestion: async () => {},
+    getEligibleOfferListingIds: async () => [],
+    sendOfferToInterestedBuyers: async () => {},
   };
 }
 
