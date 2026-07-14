@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { setModelAction, MODEL_OPTIONS } from '@/app/settings/actions';
+import { setModelAction } from '@/app/settings/actions';
+import { MODEL_OPTIONS } from '@/app/settings/model-options';
 
 export function ModelSelector({ current }: { current: string }) {
   const [value, setValue] = useState(current);
