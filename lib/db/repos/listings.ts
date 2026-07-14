@@ -16,6 +16,7 @@ export interface ListingRow {
   ebayCategoryId: string | null;
   soldAt: string | null;
   salePrice: number | null;
+  listedAt: string | null; // when it actually went live on eBay
   createdAt: string;
   updatedAt: string;
 }
@@ -35,6 +36,7 @@ interface RawListing {
   ebay_category_id: string | null;
   sold_at: string | Date | null;
   sale_price: string | null;
+  listed_at: string | Date | null;
   created_at: string | Date;
   updated_at: string | Date;
 }
@@ -55,6 +57,7 @@ function mapListing(r: RawListing): ListingRow {
     condition: r.condition,
     ebayCategoryId: r.ebay_category_id,
     soldAt: r.sold_at === null || r.sold_at === undefined ? null : new Date(r.sold_at).toISOString(),
+    listedAt: r.listed_at === null || r.listed_at === undefined ? null : new Date(r.listed_at).toISOString(),
     salePrice: r.sale_price === null || r.sale_price === undefined ? null : Number(r.sale_price),
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
@@ -153,6 +156,7 @@ export interface ListingUpdate {
   linterReport?: unknown;
   condition?: ItemCondition;
   ebayCategoryId?: string | null;
+  listedAt?: string | null;
 }
 
 export async function updateListing(db: Db, id: string, patch: ListingUpdate): Promise<void> {
@@ -172,6 +176,7 @@ export async function updateListing(db: Db, id: string, patch: ListingUpdate): P
   if (patch.linterReport !== undefined) add('linter_report', JSON.stringify(patch.linterReport), '::jsonb');
   if (patch.condition !== undefined) add('condition', patch.condition);
   if (patch.ebayCategoryId !== undefined) add('ebay_category_id', patch.ebayCategoryId);
+  if (patch.listedAt !== undefined) add('listed_at', patch.listedAt, '::timestamptz');
   if (sets.length === 0) return;
   sets.push('updated_at = now()');
   await db.query(`update listings set ${sets.join(', ')} where id = $1`, params);

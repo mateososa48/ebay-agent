@@ -1,5 +1,6 @@
 import { Card, Eyebrow, Pill, type Tone } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
+import { LocalTime, RelativeTime } from '@/components/ui/time';
 import type { ListingAnalytics } from '@/lib/queries';
 
 type Snap = ListingAnalytics['series'][number];
@@ -11,18 +12,7 @@ function money(n: number): string {
   return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
 }
 
-function fmtDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function ago(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
+const DAY_FMT = { month: 'short', day: 'numeric' } as const;
 
 /** Change in a metric vs the snapshot closest to 24h before the latest one. */
 function delta(series: Snap[], key: MetricKey): { diff: number; label: string } | null {
@@ -77,7 +67,7 @@ function StatCell({
 }: {
   label: string;
   value: string;
-  sub?: string;
+  sub?: React.ReactNode;
   accent?: string;
   chip?: React.ReactNode;
 }) {
@@ -111,10 +101,12 @@ export function AnalyticsPanel({
   price: number;
   sold: boolean;
 }) {
-  const { series, latest, listedAt, soldAt, salePrice } = analytics;
+  const { series, latest, listedAt, soldAt, salePrice, offers } = analytics;
 
   const watchers = latest?.watchCount;
   const views = latest?.hitCount;
+  const offersSent = offers.filter((o) => o.status === 'sent').length;
+  const offersDrafted = offers.filter((o) => o.status === 'drafted').length;
 
   const startIso = listedAt ?? series[0]?.capturedAt ?? null;
   const endMs = sold && soldAt ? new Date(soldAt).getTime() : Date.now();
@@ -125,7 +117,7 @@ export function AnalyticsPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
         <Eyebrow>{sold ? 'Final performance' : 'Performance'}</Eyebrow>
         <span className="font-mono text-[11px] text-ink-faint">
-          {latest ? `checked ${ago(latest.capturedAt)}` : 'no snapshots yet'}
+          {latest ? <>checked <RelativeTime iso={latest.capturedAt} /></> : 'no snapshots yet'}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-px border-t border-hairline bg-hairline lg:grid-cols-4">
@@ -135,23 +127,37 @@ export function AnalyticsPanel({
           sub={sold ? 'were watching at the end' : 'watching right now'}
           chip={<DeltaChip d={delta(series, 'watchCount')} />}
         />
-        <StatCell
-          label="Views"
-          value={views == null ? '—' : views.toLocaleString('en-US')}
-          sub="lifetime page views"
-          chip={<DeltaChip d={delta(series, 'hitCount')} />}
-        />
+        {views != null ? (
+          <StatCell
+            label="Views"
+            value={views.toLocaleString('en-US')}
+            sub="lifetime page views"
+            chip={<DeltaChip d={delta(series, 'hitCount')} />}
+          />
+        ) : (
+          <StatCell
+            label="Offers"
+            value={offersSent > 0 ? String(offersSent) : offersDrafted > 0 ? '0' : '—'}
+            sub={
+              offersSent > 0
+                ? 'sent to interested buyers'
+                : offersDrafted > 0
+                  ? `${offersDrafted} drafted, awaiting you`
+                  : 'none eligible yet'
+            }
+          />
+        )}
         <StatCell
           label={sold ? 'Days to sell' : 'Days live'}
           value={days == null ? '—' : String(days)}
-          sub={startIso ? `listed ${fmtDay(startIso)}` : 'listing date unknown'}
+          sub={startIso ? <>listed <LocalTime iso={startIso} options={DAY_FMT} /></> : 'listing date unknown'}
         />
         {sold ? (
           <StatCell
             label="Sold for"
             value={salePrice == null ? money(price) : money(salePrice)}
             accent="var(--ebay-green-deep)"
-            sub={`${soldAt ? fmtDay(soldAt) : 'date unknown'} · asked ${money(price)}`}
+            sub={soldAt ? <>sold <LocalTime iso={soldAt} options={DAY_FMT} /> · asked {money(price)}</> : `asked ${money(price)}`}
           />
         ) : (
           <StatCell label="Asking" value={money(price)} sub="adjust it in the price card" />
@@ -192,7 +198,7 @@ export function OffersCard({ offers }: { offers: ListingAnalytics['offers'] }) {
                     −{Math.round(o.discountPct)}%
                   </span>
                 </div>
-                <div className="mt-0.5 font-mono text-[11px] text-ink-faint">{ago(o.createdAt)}</div>
+                <div className="mt-0.5 font-mono text-[11px] text-ink-faint"><RelativeTime iso={o.createdAt} /></div>
               </div>
               <Pill tone={meta.tone}>{meta.label}</Pill>
             </li>

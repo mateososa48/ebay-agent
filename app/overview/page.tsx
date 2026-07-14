@@ -6,13 +6,14 @@ import { OverviewListingsTable } from '@/components/overview/listings-table';
 import { RevenueChart } from '@/components/overview/revenue-chart';
 import { StatStrip } from '@/components/overview/stat-strip';
 import { Icon } from '@/components/ui/icons';
-import { Dot, Eyebrow } from '@/components/ui/primitives';
+import { Eyebrow } from '@/components/ui/primitives';
+import { Freshness } from '@/components/ui/freshness';
 import { getDashboardData, type DashboardData } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
 const EMPTY: DashboardData = {
-  stats: { live: 0, sold: 0, revenue: 0, queuedValue: 0, pendingApprovals: 0, totalWatchers: 0, totalViews: 0 },
+  stats: { live: 0, sold: 0, revenue: 0, queuedValue: 0, pendingApprovals: 0, totalWatchers: 0, offersSent: 0, lastSnapshotAt: null },
   liveListings: [],
   salesByWeek: [],
   attention: [],
@@ -79,10 +80,7 @@ export default async function OverviewPage() {
             Everything the desk is doing — sales, demand, and what&rsquo;s waiting on you.
           </p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 shadow-raised">
-          <Dot tone="green" pulse />
-          <span className="font-mono text-[11px] text-ink-faint">updated just now</span>
-        </span>
+        <Freshness lastCapturedAt={data.stats.lastSnapshotAt} />
       </header>
 
       <div className="reveal mt-6" style={{ animationDelay: '60ms' }}>

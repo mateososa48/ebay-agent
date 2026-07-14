@@ -15,6 +15,7 @@ const DETAILS: EbayItemDetails = {
   categoryId: '112529',
   conditionId: 3000,
   specifics: { Brand: 'Sony', Model: 'WH-1000XM4' },
+  startTime: '2026-06-01T12:00:00.000Z',
 };
 
 function importAdapter(active: EbayActiveListing[], details: Record<string, EbayItemDetails>): EbayAdapter {

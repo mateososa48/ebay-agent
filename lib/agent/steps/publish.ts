@@ -109,7 +109,11 @@ export async function publishApprovedListing(
   // The listing now exists on eBay. Persist that fact FIRST; if this write fails,
   // tell the seller NOT to retry (a blind retry would create a second live listing).
   try {
-    await updateListing(db, listingId, { status: 'live', ebayListingId: result.ebayListingId });
+    await updateListing(db, listingId, {
+      status: 'live',
+      ebayListingId: result.ebayListingId,
+      listedAt: new Date().toISOString(),
+    });
     await updateItemStatus(db, item.id, 'listed');
     await decideApproval(db, approval.id, 'approved');
     await recordEvent(db, { itemId: item.id, kind: 'published', data: { ebayListingId: result.ebayListingId, url: result.url } });

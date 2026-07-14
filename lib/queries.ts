@@ -392,7 +392,7 @@ export async function getListingAnalytics(listingId: string): Promise<ListingAna
          from offers where listing_id = $1 order by created_at desc limit 10`,
         [listingId],
       ),
-      db.query<Row>(`select item_id, sold_at, sale_price, updated_at, status from listings where id = $1`, [listingId]),
+      db.query<Row>(`select item_id, sold_at, sale_price, listed_at, updated_at, status from listings where id = $1`, [listingId]),
     ]);
     const listing = listingRow.rows[0];
     let timeline: ListingAnalytics['timeline'] = [];
@@ -409,7 +409,12 @@ export async function getListingAnalytics(listingId: string): Promise<ListingAna
         createdAt: new Date(String(r.created_at)).toISOString(),
       }));
       const listedEvent = ev.rows.find((r) => r.kind === 'published' || r.kind === 'listing.imported');
-      listedAt = listedEvent ? new Date(String(listedEvent.created_at)).toISOString() : null;
+      // Prefer eBay's real go-live time; the import/publish event is only a fallback.
+      listedAt = listing.listed_at
+        ? new Date(String(listing.listed_at)).toISOString()
+        : listedEvent
+          ? new Date(String(listedEvent.created_at)).toISOString()
+          : null;
     }
     const series = metrics.rows.map((r) => ({
       watchCount: r.watch_count == null ? null : Number(r.watch_count),
@@ -455,7 +460,8 @@ export interface DashboardData {
     queuedValue: number; // drafts awaiting approval
     pendingApprovals: number; // all types
     totalWatchers: number;
-    totalViews: number;
+    offersSent: number;
+    lastSnapshotAt: string | null; // newest metrics snapshot — freshness signal
   };
   liveListings: {
     id: string;
@@ -479,7 +485,7 @@ export async function getDashboardData(nowMs: number): Promise<DashboardData> {
   serverNow = () => nowMs;
   const db = getDb();
   const data: DashboardData = {
-    stats: { live: 0, sold: 0, revenue: 0, queuedValue: 0, pendingApprovals: 0, totalWatchers: 0, totalViews: 0 },
+    stats: { live: 0, sold: 0, revenue: 0, queuedValue: 0, pendingApprovals: 0, totalWatchers: 0, offersSent: 0, lastSnapshotAt: null },
     liveListings: [],
     salesByWeek: [],
     attention: [],
@@ -528,7 +534,7 @@ export async function getDashboardData(nowMs: number): Promise<DashboardData> {
          where rn <= 24
          group by listing_id
        )
-       select l.id, l.title, l.price, l.created_at, i.photos,
+       select l.id, l.title, l.price, coalesce(l.listed_at, l.created_at) as created_at, i.photos,
               m.watch_count, m.hit_count, s.watches,
               (select count(*) from buyer_messages bm where bm.listing_id = l.id and bm.status = 'drafted') as open_msgs,
               (select o.status from offers o where o.listing_id = l.id and o.status in ('drafted','sent')
@@ -559,7 +565,16 @@ export async function getDashboardData(nowMs: number): Promise<DashboardData> {
       };
     });
     data.stats.totalWatchers = data.liveListings.reduce((s, l) => s + (l.watchers ?? 0), 0);
-    data.stats.totalViews = data.liveListings.reduce((s, l) => s + (l.views ?? 0), 0);
+  } catch { /* ignore */ }
+
+  try {
+    const { rows } = await db.query<Row>(`select count(*) as n from offers where status = 'sent'`);
+    data.stats.offersSent = Number(rows[0]?.n ?? 0);
+  } catch { /* ignore */ }
+
+  try {
+    const { rows } = await db.query<Row>(`select max(captured_at) as t from listing_metrics`);
+    data.stats.lastSnapshotAt = rows[0]?.t ? new Date(String(rows[0].t)).toISOString() : null;
   } catch { /* ignore */ }
 
   try {

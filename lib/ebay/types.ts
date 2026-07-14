@@ -91,6 +91,7 @@ export interface EbayItemDetails {
   categoryId: string | null;
   conditionId: number | null;
   specifics: Record<string, string>;
+  startTime: string | null; // ISO — when the listing actually went live on eBay
 }
 
 /**

@@ -16,7 +16,7 @@ export function StatStrip({
   const cells: { label: string; value: string; sub: string; accent?: string }[] = [
     { label: 'Live', value: fmtInt(stats.live), sub: 'on eBay now' },
     { label: 'Watchers', value: fmtInt(stats.totalWatchers), sub: 'across live listings' },
-    { label: 'Views', value: fmtInt(stats.totalViews), sub: 'total impressions' },
+    { label: 'Offers sent', value: fmtInt(stats.offersSent), sub: 'to interested buyers' },
     { label: 'Sold', value: fmtInt(stats.sold), sub: 'all time' },
     {
       label: 'Revenue',

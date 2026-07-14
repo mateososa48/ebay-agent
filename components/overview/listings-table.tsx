@@ -36,12 +36,11 @@ export function OverviewListingsTable({ rows }: { rows: Row[] }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-hairline bg-surface shadow-raised">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] table-fixed border-collapse">
+        <table className="w-full min-w-[760px] table-fixed border-collapse">
           <colgroup>
             <col />
             <col className="w-[86px]" />
             <col className="w-[88px]" />
-            <col className="w-[76px]" />
             <col className="w-[82px]" />
             <col className="w-[60px]" />
             <col className="w-[92px]" />
@@ -52,7 +51,6 @@ export function OverviewListingsTable({ rows }: { rows: Row[] }) {
               <th className={cn(HEAD, 'pl-4 text-left')}>Listing</th>
               <th className={cn(HEAD, 'text-right')}>Price</th>
               <th className={cn(HEAD, 'text-right')}>Watchers</th>
-              <th className={cn(HEAD, 'text-right')}>Views</th>
               <th className={cn(HEAD, 'text-right')}>Days live</th>
               <th className={cn(HEAD, 'text-right')}>Msgs</th>
               <th className={cn(HEAD, 'text-left')}>Offer</th>
@@ -87,9 +85,6 @@ export function OverviewListingsTable({ rows }: { rows: Row[] }) {
                 </td>
                 <td className={cn(CELL, 'font-semibold text-ink')}>
                   <Num value={r.watchers} />
-                </td>
-                <td className={CELL}>
-                  <Num value={r.views} />
                 </td>
                 <td className={CELL}>{r.daysLive}d</td>
                 <td className={CELL}>

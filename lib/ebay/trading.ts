@@ -127,6 +127,7 @@ export function parseItemDetails(xml: string): EbayItemDetails | null {
     const value = nv.match(/<Value>([\s\S]*?)<\/Value>/)?.[1]?.trim();
     if (name && value) specifics[name] = value;
   }
+  const startTime = xml.match(/<StartTime>([^<]+)<\/StartTime>/)?.[1] ?? null;
   return {
     ebayListingId,
     title,
@@ -136,6 +137,7 @@ export function parseItemDetails(xml: string): EbayItemDetails | null {
     categoryId,
     conditionId: conditionRaw ? Number(conditionRaw) : null,
     specifics,
+    startTime,
   };
 }
 

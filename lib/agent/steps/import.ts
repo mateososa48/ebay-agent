@@ -44,9 +44,26 @@ export function stripHtml(html: string, cap = 4000): string {
 export async function importListings(db: Db, ebay: EbayAdapter, maxNew = 25): Promise<ImportResult> {
   const active = await ebay.getActiveListings();
   let imported = 0;
+  let backfilled = 0;
   for (const a of active) {
     if (imported >= maxNew) break;
-    if (await getListingByEbayId(db, a.ebayListingId)) continue; // already tracked
+    const existing = await getListingByEbayId(db, a.ebayListingId);
+    if (existing) {
+      // Self-heal listings imported before we captured eBay's StartTime, so
+      // "days live" reflects the real listing age, not the import date.
+      if (!existing.listedAt && backfilled < 5) {
+        try {
+          const d = await ebay.getItemDetails(a.ebayListingId);
+          if (d?.startTime) {
+            await updateListing(db, existing.id, { listedAt: d.startTime });
+            backfilled += 1;
+          }
+        } catch {
+          /* next run */
+        }
+      }
+      continue;
+    }
     const details = await ebay.getItemDetails(a.ebayListingId);
     if (!details) continue;
 
@@ -68,6 +85,7 @@ export async function importListings(db: Db, ebay: EbayAdapter, maxNew = 25): Pr
       status: 'live',
       ebayListingId: details.ebayListingId,
       ebayCategoryId: details.categoryId,
+      listedAt: details.startTime, // eBay's real go-live time, not our import time
     });
     await recordEvent(db, {
       itemId: item.id,

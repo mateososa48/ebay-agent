@@ -1,4 +1,5 @@
 import { Card, Eyebrow } from '@/components/ui/primitives';
+import { LocalTime, RelativeTime } from '@/components/ui/time';
 import type { ListingAnalytics } from '@/lib/queries';
 
 type Snap = ListingAnalytics['series'][number];
@@ -29,14 +30,6 @@ function lastValue(series: Snap[], key: 'watchCount' | 'hitCount'): number | nul
   return null;
 }
 
-function fmtShort(t: number): string {
-  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function fmtLong(t: number): string {
-  return new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
-
 function LegendDot({ color, label, value }: { color: string; label: string; value: number | null }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
@@ -48,9 +41,11 @@ function LegendDot({ color, label, value }: { color: string; label: string; valu
 }
 
 /**
- * Views + watchers over time, hand-rolled SVG. Each series rides its own
- * y scale so a 6-watcher curve isn't flattened under a 400-view one —
- * read it for shape, read the legend for the numbers.
+ * Watcher demand over time, hand-rolled SVG. Watchers are the one engagement
+ * signal eBay still exposes (page-view counters were retired platform-wide),
+ * so the chart leads with them; a views series appears only if eBay ever
+ * returns hit counts for this listing. Timestamps render in the viewer's
+ * timezone (client-side) — never the server's.
  */
 export function EngagementChart({ series }: { series: Snap[] }) {
   const stamped = series
@@ -63,28 +58,30 @@ export function EngagementChart({ series }: { series: Snap[] }) {
 
   const latestViews = lastValue(series, 'hitCount');
   const latestWatchers = lastValue(series, 'watchCount');
+  const hasViews = viewPts.length > 0;
 
   const allTs = [...viewPts, ...watchPts].map((p) => p.t);
   const t0 = allTs.length ? Math.min(...allTs) : 0;
   const t1 = allTs.length ? Math.max(...allTs) : 0;
   const span = Math.max(1, t1 - t0);
 
-  const views = geometry(viewPts, t0, span);
+  const views = hasViews ? geometry(viewPts, t0, span) : null;
   const watchers = geometry(watchPts, t0, span);
   const drawable = views !== null || watchers !== null;
+  const lastIso = stamped[stamped.length - 1]?.capturedAt;
 
   return (
     <Card className="reveal p-5" style={{ animationDelay: '120ms' }}>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <Eyebrow>Engagement</Eyebrow>
+          <Eyebrow>Demand</Eyebrow>
           <div className="mt-1 font-display text-[16px] font-semibold tracking-[-0.01em] text-ink">
-            Views &amp; watchers over time
+            Watchers over time
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <LegendDot color="var(--ebay-blue)" label="Views" value={latestViews} />
           <LegendDot color="var(--ebay-green)" label="Watchers" value={latestWatchers} />
+          {hasViews && <LegendDot color="var(--ebay-blue)" label="Views" value={latestViews} />}
         </div>
       </div>
 
@@ -123,21 +120,21 @@ export function EngagementChart({ series }: { series: Snap[] }) {
             )}
           </div>
           <div className="mt-2 flex items-baseline justify-between font-mono text-[11px] text-ink-faint tnum">
-            <span>{fmtShort(t0)}</span>
-            <span>{stamped.length} snapshots · every ~15 min</span>
-            <span>{fmtLong(t1)}</span>
+            <LocalTime iso={new Date(t0).toISOString()} />
+            <span>
+              {stamped.length} snapshots{lastIso ? <> · last <RelativeTime iso={lastIso} /></> : null}
+            </span>
+            <LocalTime iso={new Date(t1).toISOString()} />
           </div>
         </>
       ) : (
         <div className="mt-4 grid h-40 place-items-center rounded-xl border border-dashed border-hairline-strong bg-surface-2/40 px-6 text-center">
           <div>
             <p className="text-[13.5px] font-medium text-ink-muted">
-              Collecting data — first snapshots arrive within the hour.
+              Collecting data — the curve appears after a couple of checks.
             </p>
-            {(latestViews != null || latestWatchers != null) && (
-              <p className="mt-1 font-mono text-[11px] text-ink-faint tnum">
-                so far: {latestViews ?? 0} views · {latestWatchers ?? 0} watchers
-              </p>
+            {latestWatchers != null && (
+              <p className="mt-1 font-mono text-[11px] text-ink-faint tnum">so far: {latestWatchers} watchers</p>
             )}
           </div>
         </div>

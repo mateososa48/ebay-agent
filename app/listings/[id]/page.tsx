@@ -13,6 +13,8 @@ import { ListingTimeline } from '@/components/review/listing-timeline';
 import { Button, Dot, Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
 import { notFound } from 'next/navigation';
+import { LocalTime } from '@/components/ui/time';
+import { Freshness } from '@/components/ui/freshness';
 import { type ListingDetail } from '@/lib/sample-listing';
 import { getListingAnalytics, getListingDetail } from '@/lib/queries';
 
@@ -134,22 +136,31 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
               )}
               <Pill tone="neutral">{l.condition}</Pill>
               <span className="text-[12.5px] text-ink-muted tnum">
-                {isSold
-                  ? `${analytics.soldAt ? `sold ${fmtDay(analytics.soldAt)}` : 'sold'}${days != null ? ` · ${days} days on the market` : ''}`
-                  : days != null
-                    ? `day ${days + 1}${listedIso ? ` · listed ${fmtDay(listedIso)}` : ''}`
-                    : ''}
+                {isSold ? (
+                  <>
+                    {analytics.soldAt ? <>sold <LocalTime iso={analytics.soldAt} options={{ month: 'short', day: 'numeric' }} /></> : 'sold'}
+                    {days != null ? <> · {days} days on the market</> : null}
+                  </>
+                ) : days != null ? (
+                  <>
+                    day {days + 1}
+                    {listedIso ? <> · listed <LocalTime iso={listedIso} options={{ month: 'short', day: 'numeric' }} /></> : null}
+                  </>
+                ) : null}
               </span>
             </div>
           </div>
-          {l.ebayListingId && (
-            <Button asChild variant="secondary" size="sm" className="shrink-0">
-              <a href={`https://www.ebay.com/itm/${l.ebayListingId}`} target="_blank" rel="noreferrer">
-                View on eBay
-                <Icon.ArrowUpRight className="size-4" />
-              </a>
-            </Button>
-          )}
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <Freshness lastCapturedAt={analytics.latest?.capturedAt ?? null} />
+            {l.ebayListingId && (
+              <Button asChild variant="secondary" size="sm">
+                <a href={`https://www.ebay.com/itm/${l.ebayListingId}`} target="_blank" rel="noreferrer">
+                  View on eBay
+                  <Icon.ArrowUpRight className="size-4" />
+                </a>
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -157,16 +168,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         <AnalyticsPanel analytics={analytics} price={l.price} sold={isSold} />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)]">
-        <div className="min-w-0 space-y-5">
-          <EngagementChart series={analytics.series} />
-          <MessageThread messages={analytics.messages} />
-          {/* Title/description are locked once on eBay — only the price card stays editable. */}
-          <ListingBody listing={l} editable={false} />
-        </div>
-
+      {/* v2: same skeleton as the draft review page (photos + chat left, work right)
+          so the app feels like ONE tool — the right rail just swaps copy-editing
+          for performance once the listing is live. */}
+      <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,400px)_1fr]">
         <div className="space-y-5">
           <Gallery photos={l.photos} title={l.title} />
+          <ReviewAssistant listing={l} disabled={false} />
+          <ListingTimeline events={analytics.timeline} />
+        </div>
+
+        <div className="min-w-0 space-y-5">
+          <EngagementChart series={analytics.series} />
           <PricePanel
             price={l.price}
             compLow={l.compLow}
@@ -176,8 +189,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             editable={!isSold}
           />
           <OffersCard offers={analytics.offers} />
-          <ListingTimeline events={analytics.timeline} />
-          <ReviewAssistant listing={l} disabled={false} />
+          <MessageThread messages={analytics.messages} />
+          {/* Title/description are locked once on eBay — read-only reference below. */}
+          <ListingBody listing={l} editable={false} />
         </div>
       </div>
     </AppShell>
