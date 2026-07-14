@@ -72,6 +72,28 @@ function stepState(started: boolean, done: boolean, prevReady: boolean): StepSta
   return 'pending';
 }
 
+// eBay's picture pipeline accepts JPEG/PNG/GIF but rejects HEIC/HEIF/WebP. iPhone camera
+// photos are HEIC by default. Re-encode anything that isn't already eBay-safe to JPEG in
+// the browser before upload. If the browser can't decode the source (e.g. HEIC in Chrome/
+// Firefox), throw so the caller shows a clear message instead of shipping an image eBay
+// will reject on the first real publish.
+async function toUploadable(file: File): Promise<File> {
+  const type = (file.type || '').toLowerCase();
+  if (type === 'image/jpeg' || type === 'image/png' || type === 'image/gif') return file;
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const canvas = document.createElement('canvas');
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas unavailable');
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close?.();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+  if (!blob) throw new Error('encode failed');
+  const base = file.name.replace(/\.[^.]+$/, '') || 'photo';
+  return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+}
+
 export function NewItemFlow() {
   const agent = useEveAgent();
   const [phase, setPhase] = useState<'upload' | 'working'>('upload');
@@ -83,6 +105,7 @@ export function NewItemFlow() {
   const [answerText, setAnswerText] = useState('');
   const [itemId, setItemId] = useState<string | null>(null);
   const [polledListingId, setPolledListingId] = useState<string | null>(null);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
 
   const messages = (agent.data?.messages ?? []) as unknown as AnyMsg[];
   const running = agent.status === 'submitted' || agent.status === 'streaming';
@@ -186,11 +209,21 @@ export function NewItemFlow() {
   const resolvedListingId = listingId ?? polledListingId;
   useEffect(() => {
     if (phase !== 'working' || !itemId || resolvedListingId) return;
+    if (agent.status === 'error') return; // hard error — stop polling, show the retry state
     let active = true;
+    let attempts = 0;
     const iv = setInterval(async () => {
+      attempts += 1;
       const id = await getDraftListingId(itemId);
-      if (active && id) {
+      if (!active) return;
+      if (id) {
         setPolledListingId(id);
+        clearInterval(iv);
+        return;
+      }
+      // Cap at ~2 min so a run that ends without ever saving a draft can't poll forever.
+      if (attempts >= 40) {
+        setPollTimedOut(true);
         clearInterval(iv);
       }
     }, 3000);
@@ -198,7 +231,7 @@ export function NewItemFlow() {
       active = false;
       clearInterval(iv);
     };
-  }, [phase, itemId, resolvedListingId]);
+  }, [phase, itemId, resolvedListingId, agent.status]);
 
   function addFiles(newFiles: File[]) {
     setFiles((prev) => [...prev, ...newFiles]);
@@ -215,8 +248,17 @@ export function NewItemFlow() {
     try {
       const uploaded: { url: string; mediaType: string }[] = [];
       for (const f of files) {
-        const res = await upload(f.name, f, { access: 'public', handleUploadUrl: '/api/blob-upload' });
-        uploaded.push({ url: res.url, mediaType: f.type || 'image/jpeg' });
+        let file: File;
+        try {
+          file = await toUploadable(f);
+        } catch {
+          throw new Error(
+            `Couldn’t process “${f.name}”. If it’s a HEIC photo, upload a JPG or PNG instead ` +
+              `(on iPhone: Settings → Camera → Formats → Most Compatible).`,
+          );
+        }
+        const res = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/blob-upload' });
+        uploaded.push({ url: res.url, mediaType: file.type || 'image/jpeg' });
       }
       const urls = uploaded.map((u) => u.url);
       const { itemId: newItemId } = await createItemAction({ photos: urls, notes });
@@ -391,10 +433,23 @@ export function NewItemFlow() {
           </div>
         )}
 
-        {agent.status === 'error' && (
-          <div className="mt-6 flex items-center gap-2 rounded-xl bg-[var(--tint-red)] px-4 py-3 text-[13px]" style={{ color: 'var(--ebay-red)' }}>
-            <Icon.Alert className="size-4" />
-            {agent.error?.message ?? 'The agent hit an error. Try again.'}
+        {!resolvedListingId && (agent.status === 'error' || pollTimedOut) && (
+          <div className="mt-6 rounded-xl border border-hairline bg-[var(--tint-red)] p-4">
+            <div className="flex items-start gap-2 text-[13px]" style={{ color: 'var(--ebay-red)' }}>
+              <Icon.Alert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                {agent.status === 'error'
+                  ? agent.error?.message ?? 'The agent hit an error before it finished.'
+                  : 'The agent didn’t save a draft — it may have stopped mid-run. Nothing was listed.'}
+              </span>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-3 h-9 rounded-full px-4 text-[13px] font-semibold text-white transition-transform active:scale-[0.97]"
+              style={{ background: 'var(--ebay-blue)' }}
+            >
+              Start over
+            </button>
           </div>
         )}
 

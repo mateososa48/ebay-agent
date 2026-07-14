@@ -11,7 +11,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async () => ({
-        allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
+        // Only eBay-safe raster formats. HEIC/HEIF/WebP are converted to JPEG client-side
+        // before upload, so nothing eBay would reject as a PictureURL reaches Blob.
+        allowedContentTypes: ['image/jpeg', 'image/png', 'image/gif'],
         addRandomSuffix: true,
         maximumSizeInBytes: 20 * 1024 * 1024,
       }),

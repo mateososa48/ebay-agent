@@ -6,7 +6,7 @@ import { Button, Card, Eyebrow, Pill } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icons';
 import { getEbayStatus } from '@/lib/queries';
 import { getDb } from '@/lib/db/client';
-import { getSetting, getListingDefaults } from '@/lib/db/repos/settings';
+import { getSetting, getListingDefaults, DEFAULT_LISTING_DEFAULTS } from '@/lib/db/repos/settings';
 import { getAiSpend } from '@/lib/ai/spend';
 import { ModelSelector } from '@/components/settings/model-selector';
 import { ListingDefaultsForm } from '@/components/settings/listing-defaults';
@@ -27,9 +27,18 @@ function Section({ title, desc, children }: { title: string; desc: string; child
 
 export default async function SettingsPage() {
   const ebay = await getEbayStatus();
-  const model = (await getSetting(getDb(), 'model')) ?? 'openai/gpt-5.4';
   const spend = await getAiSpend();
-  const defaults = await getListingDefaults(getDb());
+  // getDb() throws synchronously if DATABASE_URL is briefly unset; guard it so a DB
+  // blip degrades to safe defaults instead of 500-ing the one page used to reconnect.
+  let model = 'openai/gpt-5.4';
+  let defaults = DEFAULT_LISTING_DEFAULTS;
+  try {
+    const db = getDb();
+    model = (await getSetting(db, 'model')) ?? model;
+    defaults = await getListingDefaults(db);
+  } catch {
+    /* DB unavailable — render with safe defaults */
+  }
 
   return (
     <AppShell>

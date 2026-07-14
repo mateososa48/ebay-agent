@@ -9,7 +9,36 @@ const DEFAULT_KEYS = new Set(['ship_zip', 'ship_mode', 'ship_cost', 'return_wind
 
 export async function setListingDefaultAction(key: string, value: string): Promise<{ ok: boolean }> {
   if (!DEFAULT_KEYS.has(key)) return { ok: false };
-  await setSetting(getDb(), key, value.slice(0, 100));
+  // Validate before persisting — these values flow straight into the eBay listing XML,
+  // where an out-of-range or wrong-enum value bounces the publish (or silently misprices).
+  let v = value.slice(0, 100).trim();
+  switch (key) {
+    case 'ship_mode':
+      if (v !== 'free' && v !== 'flat') return { ok: false };
+      break;
+    case 'return_window':
+      if (v !== 'days_30' && v !== 'days_60' && v !== 'none') return { ok: false };
+      break;
+    case 'require_approval':
+      if (v !== 'true' && v !== 'false') return { ok: false };
+      break;
+    case 'ship_cost': {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) return { ok: false };
+      v = (Math.round(n * 100) / 100).toString();
+      break;
+    }
+    case 'handling_days': {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0 || n > 30) return { ok: false };
+      v = String(n);
+      break;
+    }
+    case 'ship_zip':
+      // free-form (already trimmed + capped); empty clears it
+      break;
+  }
+  await setSetting(getDb(), key, v);
   revalidatePath('/settings');
   return { ok: true };
 }

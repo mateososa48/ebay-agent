@@ -20,7 +20,10 @@ export function Dropzone({
 
   function handleFiles(list: FileList | null) {
     if (!list) return;
-    const imgs = Array.from(list).filter((f) => f.type.startsWith('image/'));
+    // Some browsers hand over HEIC files with an empty MIME type — accept by extension too.
+    const imgs = Array.from(list).filter(
+      (f) => f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|tiff?|heic|heif)$/i.test(f.name),
+    );
     if (imgs.length) onAdd(imgs);
   }
 

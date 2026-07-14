@@ -8,16 +8,25 @@ import { loginAction } from './actions';
 export default function LoginPage() {
   const router = useRouter();
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(false);
+    setError(null);
     start(async () => {
       const r = await loginAction(password);
-      if (r.ok) router.replace('/');
-      else setError(true);
+      if (r.ok) {
+        // Honor the middleware's ?next= deep link, but only same-origin relative paths
+        // (starts with a single '/') so it can never be an open redirect.
+        const next = new URLSearchParams(window.location.search).get('next');
+        const dest = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+        router.replace(dest);
+      } else if (r.reason === 'misconfigured') {
+        setError('Login isn’t fully set up — EVE_APP_PASSWORD is missing. Set it in Vercel and redeploy.');
+      } else {
+        setError('That password didn’t match.');
+      }
     });
   }
 
@@ -44,7 +53,7 @@ export default function LoginPage() {
             placeholder="Password"
             className="w-full rounded-2xl border border-hairline bg-surface px-4 py-3.5 text-[15px] text-ink shadow-raised outline-none transition-colors placeholder:text-ink-faint focus:border-[var(--ebay-blue)]"
           />
-          {error && <p className="px-1 text-[13px]" style={{ color: 'var(--ebay-red)' }}>That password didn&rsquo;t match.</p>}
+          {error && <p className="px-1 text-[13px]" style={{ color: 'var(--ebay-red)' }}>{error}</p>}
           <button
             type="submit"
             disabled={pending || !password}

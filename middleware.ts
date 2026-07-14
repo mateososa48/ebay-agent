@@ -6,8 +6,12 @@ import type { NextRequest } from 'next/server';
 //  - eBay's OAuth callback (eBay's servers hit this with no cookie) + health
 //  - the eve agent endpoints: the durable workflow runtime re-invokes steps via
 //    internal server-to-server calls that carry no browser cookie, so gating these
-//    would break the agent mid-run. The UI that drives them is gated at the page
-//    level, so this only exposes the raw (unguessable) agent URLs.
+//    would break the agent mid-run. The UI that drives them is gated at the page level.
+//    NOTE: /eve/v1/* is a FIXED framework path, not an unguessable one — anyone who
+//    knows the domain can POST to it. Accepted tradeoff for a personal tool: the agent
+//    has no publish tool (publishing still needs manual approval), so the worst case is
+//    junk drafts / LLM-credit burn, not unwanted live listings. Revisit with a shared
+//    secret or per-call auth if this ever hosts more than one user.
 const PUBLIC_PATHS = [
   '/login',
   '/privacy',
