@@ -41,13 +41,20 @@ type InputReq = {
   allowFreeform?: boolean;
   options?: readonly { id: string; label: string; description?: string; style?: 'danger' | 'default' | 'primary' }[];
 };
-type EvePart = AnyPart & { eve?: { inputRequest?: InputReq; inputResponse?: unknown } };
+type EvePart = AnyPart & {
+  // The reducer projects HITL onto dynamic-tool parts at toolMetadata.eve.*
+  // (verified against eve's shipped message-reducer). Reading the wrong path
+  // here is why questions rendered as a dead gray pipeline for weeks.
+  toolMetadata?: { eve?: { inputRequest?: InputReq; inputResponse?: unknown } };
+  eve?: { inputRequest?: InputReq; inputResponse?: unknown }; // legacy fallback
+};
 
 /** The most recent unanswered question the agent raised via ask_question, if any. */
 function pendingQuestion(messages: AnyMsg[]): InputReq | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     for (const p of (messages[i]?.parts ?? []) as EvePart[]) {
-      if (p.eve?.inputRequest && !p.eve.inputResponse) return p.eve.inputRequest;
+      const meta = p.toolMetadata?.eve ?? p.eve;
+      if (meta?.inputRequest && !meta.inputResponse) return meta.inputRequest;
     }
   }
   return null;
@@ -96,7 +103,13 @@ async function toUploadable(file: File): Promise<File> {
   return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
 }
 
-export function NewItemFlow({ resumeItemId }: { resumeItemId?: string }) {
+export function NewItemFlow({
+  resumeItemId,
+  onRunStarted,
+}: {
+  resumeItemId?: string;
+  onRunStarted?: (itemId: string) => void;
+}) {
   // Resume a background run: restore its persisted stream events + session
   // cursor so history re-renders and pending questions stay answerable.
   // (Read once — useEveAgent only consumes options on first mount; the page
@@ -382,6 +395,7 @@ export function NewItemFlow({ resumeItemId }: { resumeItemId?: string }) {
       const { itemId: newItemId } = await createItemAction({ photos: urls, notes });
       setItemId(newItemId);
       itemIdRef.current = newItemId;
+      onRunStarted?.(newItemId);
       // Register the run so it survives navigation (background-runs tray + resume).
       saveRun({
         itemId: newItemId,

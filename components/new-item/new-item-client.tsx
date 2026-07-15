@@ -12,14 +12,17 @@ import { ActiveRuns } from './active-runs';
  */
 export function NewItemClient({ runId }: { runId?: string }) {
   const [mounted, setMounted] = useState(false);
+  // A run started on this very page (no ?run= in the URL yet) must not also
+  // appear in the tray below it.
+  const [startedItemId, setStartedItemId] = useState<string | null>(null);
   useEffect(() => setMounted(true), []);
   if (!mounted) {
     return <div className="mx-auto max-w-2xl py-24" aria-busy="true" />;
   }
   return (
     <>
-      <NewItemFlow key={runId ?? 'new'} resumeItemId={runId} />
-      <ActiveRuns excludeItemId={runId ?? null} />
+      <NewItemFlow key={runId ?? 'new'} resumeItemId={runId} onRunStarted={setStartedItemId} />
+      <ActiveRuns excludeItemId={runId ?? startedItemId} />
     </>
   );
 }
