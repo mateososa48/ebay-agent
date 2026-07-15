@@ -30,15 +30,42 @@ export function buildFixedPriceItemXml(
   // A literal ']]>' in seller text would close the CDATA early and corrupt the XML.
   const description = input.description.replace(/]]>/g, ']]]]><![CDATA[>');
 
-  // Shipping / returns / handling come from the seller's Settings (defaults: free, 30-day, 3-day).
-  const handling = input.handlingDays ?? 3;
-  const shipFree = (input.shippingMode ?? 'free') === 'free';
-  const shipCost = shipFree ? '0.00' : (input.shippingCost ?? 0).toFixed(2);
-  const rw = input.returnWindow ?? 'days_30';
-  const returnPolicy =
-    rw === 'none'
-      ? '<ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>'
-      : `<ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption><ReturnsWithinOption>${rw === 'days_60' ? 'Days_60' : 'Days_30'}</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>`;
+  // Two shipping modes:
+  //  - Business Policies (SellerProfiles): the account's saved policies carry
+  //    shipping/returns/handling — inline tags MUST be omitted (opted-in
+  //    accounts reject them with "Input data for tag <Item.ShippingDetails>
+  //    is invalid or missing").
+  //  - Inline: shipping/returns/handling from the seller's Settings
+  //    (defaults: free, 30-day, 3-day).
+  let policyBlock: string;
+  if (input.sellerProfiles) {
+    const p = input.sellerProfiles;
+    policyBlock = `<SellerProfiles>
+      <SellerShippingProfile><ShippingProfileID>${esc(p.shippingProfileId)}</ShippingProfileID></SellerShippingProfile>
+      <SellerPaymentProfile><PaymentProfileID>${esc(p.paymentProfileId)}</PaymentProfileID></SellerPaymentProfile>
+      <SellerReturnProfile><ReturnProfileID>${esc(p.returnProfileId)}</ReturnProfileID></SellerReturnProfile>
+    </SellerProfiles>`;
+  } else {
+    const handling = input.handlingDays ?? 3;
+    const shipFree = (input.shippingMode ?? 'free') === 'free';
+    const shipCost = shipFree ? '0.00' : (input.shippingCost ?? 0).toFixed(2);
+    const rw = input.returnWindow ?? 'days_30';
+    const returnPolicy =
+      rw === 'none'
+        ? '<ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>'
+        : `<ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption><ReturnsWithinOption>${rw === 'days_60' ? 'Days_60' : 'Days_30'}</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>`;
+    policyBlock = `<DispatchTimeMax>${handling}</DispatchTimeMax>
+    <ShippingDetails>
+      <ShippingType>Flat</ShippingType>
+      <ShippingServiceOptions>
+        <ShippingServicePriority>1</ShippingServicePriority>
+        <ShippingService>USPSGroundAdvantage</ShippingService>
+        <ShippingServiceCost currencyID="USD">${shipCost}</ShippingServiceCost>
+        <FreeShipping>${shipFree ? 'true' : 'false'}</FreeShipping>
+      </ShippingServiceOptions>
+    </ShippingDetails>
+    <ReturnPolicy>${returnPolicy}</ReturnPolicy>`;
+  }
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <${root} xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -56,19 +83,9 @@ export function buildFixedPriceItemXml(
     <ListingType>FixedPriceItem</ListingType>
     <Quantity>1</Quantity>
     <PostalCode>${esc(input.postalCode)}</PostalCode>
-    <DispatchTimeMax>${handling}</DispatchTimeMax>
     <ItemSpecifics>${specifics}</ItemSpecifics>
     <PictureDetails>${pictures}</PictureDetails>
-    <ShippingDetails>
-      <ShippingType>Flat</ShippingType>
-      <ShippingServiceOptions>
-        <ShippingServicePriority>1</ShippingServicePriority>
-        <ShippingService>USPSGroundAdvantage</ShippingService>
-        <ShippingServiceCost currencyID="USD">${shipCost}</ShippingServiceCost>
-        <FreeShipping>${shipFree ? 'true' : 'false'}</FreeShipping>
-      </ShippingServiceOptions>
-    </ShippingDetails>
-    <ReturnPolicy>${returnPolicy}</ReturnPolicy>
+    ${policyBlock}
   </Item>
 </${root}>`;
 }

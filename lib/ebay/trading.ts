@@ -22,6 +22,17 @@ export interface TradingResponse {
 
 const TRADING_COMPAT_LEVEL = '1349';
 
+/** eBay entity-escapes its LongMessages ("&lt;Item.ShippingDetails&gt;") — decode
+ *  so sellers read "<Item.ShippingDetails>", not markup soup. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
 /** Pull Ack/ItemID and Error-severity messages out of a Trading XML response. */
 export function parseTradingResponse(xml: string): TradingResponse {
   const ack = xml.match(/<Ack>(\w+)<\/Ack>/)?.[1] ?? 'Unknown';
@@ -32,7 +43,7 @@ export function parseTradingResponse(xml: string): TradingResponse {
     if (severity && severity !== 'Error') continue;
     const msg = block.match(/<LongMessage>([\s\S]*?)<\/LongMessage>/)?.[1]
       ?? block.match(/<ShortMessage>([\s\S]*?)<\/ShortMessage>/)?.[1];
-    if (msg) errors.push(msg.trim());
+    if (msg) errors.push(decodeEntities(msg.trim()));
   }
   return { ack, itemId, errors };
 }

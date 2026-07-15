@@ -101,32 +101,33 @@ export function NewItemFlow({ resumeItemId }: { resumeItemId?: string }) {
   // (Read once — useEveAgent only consumes options on first mount; the page
   // keys this component by run so switching runs remounts it.)
   const resumed = useMemo(() => (resumeItemId ? loadRun(resumeItemId) : null), [resumeItemId]);
-  const eventLog = useRef<unknown[]>(resumed?.events ? [...resumed.events] : []);
   const itemIdRef = useRef<string | null>(resumed?.itemId ?? null);
   const resolvedListingIdRef = useRef<string | null>(resumed?.listingId ?? null);
 
   const agent = useEveAgent({
+    // Re-seed the store from the persisted authoritative stream + resume cursor
+    // (options are read once, on first mount — the page keys this component).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     initialEvents: (resumed?.events ?? []) as any,
     initialSession: resumed?.sessionId
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ({ sessionId: resumed.sessionId, streamIndex: resumed.events.length } as any)
       : undefined,
-    onEvent: (e: unknown) => {
-      eventLog.current.push(e);
-      const id = itemIdRef.current;
-      if (id) patchRun(id, { events: eventLog.current });
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onFinish: (s: any) => {
-      const id = itemIdRef.current;
-      if (!id) return;
-      patchRun(id, {
-        events: eventLog.current,
-        ...(s?.session?.sessionId ? { sessionId: s.session.sessionId as string } : {}),
-      });
-    },
   });
+
+  // Persist the run from the snapshot itself: `agent.events` is the authoritative
+  // server stream and `agent.session` carries the sessionId once a turn boundary
+  // lands — both documented snapshot fields, no callback plumbing to go stale.
+  const agentEvents = agent.events as unknown as unknown[];
+  const sessionId = (agent.session as unknown as { sessionId?: string } | undefined)?.sessionId;
+  useEffect(() => {
+    const id = itemIdRef.current;
+    if (!id || agentEvents.length === 0) return;
+    patchRun(id, {
+      events: [...agentEvents],
+      ...(sessionId ? { sessionId } : {}),
+    });
+  }, [agentEvents, sessionId]);
   const [phase, setPhase] = useState<'upload' | 'working'>(resumed ? 'working' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>(resumed?.previews ?? []);

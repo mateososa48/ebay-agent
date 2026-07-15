@@ -26,6 +26,10 @@ export interface PublishListingInput {
   shippingCost?: number; // USD, when shippingMode === 'flat'
   returnWindow?: 'days_30' | 'days_60' | 'none';
   handlingDays?: number;
+  /** Business-policy profile ids. When set, the XML references these via
+   *  SellerProfiles and OMITS inline shipping/returns/handling — required for
+   *  accounts opted into eBay Business Policies, which reject the inline tags. */
+  sellerProfiles?: { shippingProfileId: string; paymentProfileId: string; returnProfileId: string };
 }
 
 export interface VerifyResult {

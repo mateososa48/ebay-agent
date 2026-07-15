@@ -11,6 +11,9 @@ import { recordEvent } from '../../db/repos/events';
 export interface PublishDeps {
   resolveCategoryId: (title: string) => Promise<string | null>;
   getPostalCode: () => Promise<string | null>;
+  /** The account's Business Policy ids, or null when not opted in. Opted-in
+   *  accounts reject inline ShippingDetails, so this decides the XML mode. */
+  getSellerPolicies?: () => Promise<{ shippingProfileId: string; paymentProfileId: string; returnProfileId: string } | null>;
 }
 
 export type PublishOutcome = { ok: true; url: string } | { ok: false; errors: string[] };
@@ -74,6 +77,18 @@ export async function publishApprovedListing(
     ? (listing.condition as ItemCondition)
     : 'used_good';
 
+  // Business Policies: if the account is opted in, reference its saved policy
+  // profiles — opted-in accounts REJECT inline ShippingDetails/ReturnPolicy.
+  // Falls back to inline settings-driven shipping when no policies exist.
+  let sellerProfiles: PublishListingInput['sellerProfiles'];
+  if (deps.getSellerPolicies) {
+    try {
+      sellerProfiles = (await deps.getSellerPolicies()) ?? undefined;
+    } catch {
+      sellerProfiles = undefined; // policy lookup failure → try inline; Verify will arbitrate
+    }
+  }
+
   const input: PublishListingInput = {
     title: listing.title,
     description: listing.description,
@@ -88,6 +103,7 @@ export async function publishApprovedListing(
     shippingCost: defaults.shipCost,
     returnWindow: defaults.returnWindow,
     handlingDays: defaults.handlingDays,
+    sellerProfiles,
   };
 
   let verify;

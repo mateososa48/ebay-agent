@@ -6,6 +6,7 @@ import { getDb } from '@/lib/db/client';
 import { getEbayAdapter, isLiveBackend } from '@/lib/ebay';
 import { suggestCategoryId } from '@/lib/ebay/category';
 import { getSellerPostalCode } from '@/lib/ebay/trading';
+import { getSellerPolicyIds } from '@/lib/ebay/account';
 import { publishApprovedListing, type PublishOutcome } from '@/lib/agent/steps/publish';
 import { applyListingEdit, type ListingEdit, type EditResult } from '@/lib/agent/steps/editListing';
 import { getPendingApprovalByRef, decideApproval } from '@/lib/db/repos/approvals';
@@ -22,6 +23,7 @@ export async function publishListingAction(listingId: string): Promise<PublishOu
       isLiveBackend()
         ? getSellerPostalCode().then((z) => z ?? process.env.SELLER_POSTAL_CODE ?? null)
         : Promise.resolve(process.env.SELLER_POSTAL_CODE ?? '94103'),
+    getSellerPolicies: () => (isLiveBackend() ? getSellerPolicyIds() : Promise.resolve(null)),
   });
   if (outcome.ok) revalidatePath(`/listings/${listingId}`);
   return outcome;

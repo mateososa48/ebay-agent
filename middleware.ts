@@ -19,6 +19,8 @@ const PUBLIC_PATHS = [
   '/api/health',
   // Vercel Cron invokes this with no desk_auth cookie; the route self-guards with CRON_SECRET.
   '/api/cron',
+  // Publish-preflight diagnostic — also self-guarded with CRON_SECRET.
+  '/api/ebay/preflight',
   '/eve',
   '/.well-known',
 ];
