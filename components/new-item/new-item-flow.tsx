@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useEveAgent } from 'eve/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Client, defaultMessageReducer } from 'eve/client';
+import type { HandleMessageStreamEvent } from 'eve/client';
 import type { UserContent } from 'ai';
 import { upload } from '@vercel/blob/client';
 import { createItemAction, getDraftListingId } from '@/lib/actions';
@@ -104,30 +105,90 @@ export function NewItemFlow({ resumeItemId }: { resumeItemId?: string }) {
   const itemIdRef = useRef<string | null>(resumed?.itemId ?? null);
   const resolvedListingIdRef = useRef<string | null>(resumed?.listingId ?? null);
 
-  const agent = useEveAgent({
-    // Re-seed the store from the persisted authoritative stream + resume cursor
-    // (options are read once, on first mount — the page keys this component).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    initialEvents: (resumed?.events ?? []) as any,
-    initialSession: resumed?.sessionId
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ({ sessionId: resumed.sessionId, streamIndex: resumed.events.length } as any)
-      : undefined,
-  });
+  /* --------------- Run engine: lower-level eve client ---------------
+     The run lives SERVER-side; this component is just a viewport onto its
+     event stream. The kickoff POST hands back the sessionId immediately, so
+     we persist it before a single event streams — and a resumed mount replays
+     the whole run from the server (startIndex 0..n) plus the live tail, even
+     if the user left the page one second after starting. */
+  const clientRef = useRef(new Client({ host: '', preserveCompletedSessions: true }));
+  const sessionRef = useRef<ReturnType<Client['session']> | null>(null);
+  const pumpingRef = useRef(false);
+  const [events, setEvents] = useState<HandleMessageStreamEvent[]>(
+    () => (resumed?.events ?? []) as HandleMessageStreamEvent[],
+  );
+  const [engineStatus, setEngineStatus] = useState<'ready' | 'streaming' | 'error'>('ready');
+  const [engineError, setEngineError] = useState<string | null>(null);
 
-  // Persist the run from the snapshot itself: `agent.events` is the authoritative
-  // server stream and `agent.session` carries the sessionId once a turn boundary
-  // lands — both documented snapshot fields, no callback plumbing to go stale.
-  const agentEvents = agent.events as unknown as unknown[];
-  const sessionId = (agent.session as unknown as { sessionId?: string } | undefined)?.sessionId;
+  const reducer = useMemo(() => defaultMessageReducer(), []);
+  const data = useMemo(() => {
+    let acc = reducer.initial();
+    for (const e of events) acc = reducer.reduce(acc, e as never);
+    return acc;
+  }, [events, reducer]);
+
+  // Persist every appended event + keep the tray's status honest.
   useEffect(() => {
     const id = itemIdRef.current;
-    if (!id || agentEvents.length === 0) return;
-    patchRun(id, {
-      events: [...agentEvents],
-      ...(sessionId ? { sessionId } : {}),
-    });
-  }, [agentEvents, sessionId]);
+    if (!id || events.length === 0) return;
+    patchRun(id, { events: events as unknown[] });
+  }, [events]);
+
+  const pump = useCallback(async (iterable: AsyncIterable<HandleMessageStreamEvent>) => {
+    if (pumpingRef.current) return;
+    pumpingRef.current = true;
+    setEngineStatus('streaming');
+    setEngineError(null);
+    try {
+      for await (const e of iterable) {
+        setEvents((prev) => [...prev, e]);
+        const t = (e as { type?: string }).type;
+        if (t === 'session.failed' || t === 'turn.failed') {
+          setEngineError('The agent hit an error mid-run.');
+        }
+      }
+      setEngineStatus('ready');
+    } catch (e) {
+      setEngineError((e as Error).message);
+      setEngineStatus('error');
+    } finally {
+      pumpingRef.current = false;
+    }
+  }, []);
+
+  // Reattach on a resumed mount: replay any events we missed straight from the
+  // server, then keep streaming live. No sessionId (pre-fix runs) → can't
+  // reattach; the draft poll below still catches a finished run.
+  useEffect(() => {
+    if (!resumed?.sessionId || sessionRef.current) return;
+    const session = clientRef.current.session({
+      sessionId: resumed.sessionId,
+      streamIndex: resumed.events.length,
+    } as never);
+    sessionRef.current = session;
+    void pump(session.stream({ startIndex: resumed.events.length }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const agent = {
+    status: engineStatus === 'streaming' ? ('streaming' as const) : engineStatus === 'error' ? ('error' as const) : ('ready' as const),
+    error: engineError ? { message: engineError } : null,
+    data,
+    send: async (input: { message?: UserContent; inputResponses?: unknown[] }) => {
+      let session = sessionRef.current;
+      if (!session) {
+        session = clientRef.current.session();
+        sessionRef.current = session;
+      }
+      const res = await session.send(input as never);
+      // sessionId is available the moment the POST returns — persist it before
+      // any event arrives so a navigation one second in still resumes fully.
+      if (itemIdRef.current && res.sessionId) {
+        patchRun(itemIdRef.current, { sessionId: res.sessionId });
+      }
+      void pump(res);
+    },
+  };
   const [phase, setPhase] = useState<'upload' | 'working'>(resumed ? 'working' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>(resumed?.previews ?? []);
@@ -140,7 +201,7 @@ export function NewItemFlow({ resumeItemId }: { resumeItemId?: string }) {
   const [pollTimedOut, setPollTimedOut] = useState(false);
 
   const messages = (agent.data?.messages ?? []) as unknown as AnyMsg[];
-  const running = agent.status === 'submitted' || agent.status === 'streaming';
+  const running = agent.status === 'streaming';
   const question = useMemo(() => pendingQuestion(messages), [messages]);
 
   async function submitAnswer(optionId?: string) {
