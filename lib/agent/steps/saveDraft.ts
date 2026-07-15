@@ -27,8 +27,12 @@ export async function saveListingDraft(db: Db, itemId: string, draft: ListingDra
     price: draft.price,
     condition: draft.condition,
   });
-  await updateListing(db, listing.id, { linterReport: linter });
+  // Enqueue the approval IMMEDIATELY after the listing exists — it's what makes
+  // the draft visible in the queue. The Neon HTTP driver autocommits each
+  // statement separately, so if a later write dies the draft still shows up
+  // (rather than becoming an invisible orphan).
   const approval = await enqueueApproval(db, { type: 'listing', refId: listing.id });
+  await updateListing(db, listing.id, { linterReport: linter });
   await recordEvent(db, {
     itemId,
     kind: 'draft_saved',
