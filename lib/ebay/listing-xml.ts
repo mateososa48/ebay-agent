@@ -54,13 +54,16 @@ export function buildFixedPriceItemXml(
       rw === 'none'
         ? '<ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>'
         : `<ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption><ReturnsWithinOption>${rw === 'days_60' ? 'Days_60' : 'Days_30'}</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>`;
+    // USPSPriority is the service token this account/compat level accepts —
+    // USPSGroundAdvantage draws "Input data for tag <Item.ShippingDetails> is
+    // invalid or missing" (verified live via the preflight matrix, 2026-07-15).
     policyBlock = `<DispatchTimeMax>${handling}</DispatchTimeMax>
     <ShippingDetails>
       <ShippingType>Flat</ShippingType>
       <ShippingServiceOptions>
-        <ShippingServicePriority>1</ShippingServicePriority>
-        <ShippingService>USPSGroundAdvantage</ShippingService>
+        <ShippingService>USPSPriority</ShippingService>
         <ShippingServiceCost currencyID="USD">${shipCost}</ShippingServiceCost>
+        <ShippingServicePriority>1</ShippingServicePriority>
         <FreeShipping>${shipFree ? 'true' : 'false'}</FreeShipping>
       </ShippingServiceOptions>
     </ShippingDetails>
